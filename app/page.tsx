@@ -207,20 +207,40 @@ export default function Home() {
     if (st === "draft" || st === "requested") patchQuote(q.id, { status: "sent" });
   };
 
-  const sendQuote = (q: Quote) => {
-    const W = wordsFor(q.lang);
+  /** The address a customer opens, and whether it can reach them at all.
+   *  A token addresses the quote in the database so their answer writes back;
+   *  without one — no backend — the quote itself travels in the link. */
+  const customerLinkFor = (q: Quote) => {
     const base = (st.settings.customerPage ?? "").trim().replace(/[#?].*$/, "")
       || `${location.origin}/quote`;
     const isPrivate = /^https?:\/\/(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(base);
-    const intro = { pt: "Segue o orçamento do seu transfer", en: "Here is your transfer quote",
-                    fr: "Voici le devis de votre transfert" }[q.lang] ?? "Here is your transfer quote";
-
-    // A token addresses the quote in the database, so the customer's answer can
-    // be written straight back. Without one — no backend — the quote itself
-    // travels in the link instead, and they reply by message.
     const link = q.shareToken
       ? `${base}#t=${q.shareToken}`
       : `${base}#q=${encodePayload(customerPayload(q, st.settings, (v) => waDigits(v, st.settings)))}`;
+    return { link, isPrivate };
+  };
+
+  /** Hand the link over for pasting anywhere — email, SMS, anything. */
+  const copyLink = async (q: Quote) => {
+    const { link, isPrivate } = customerLinkFor(q);
+    if (isPrivate) {
+      say("This address only works on your own network — send from the deployed site.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(link);
+      markSent(q);
+      say("Link copied.");
+    } catch {
+      window.prompt("Copy this link for your customer:", link);
+    }
+  };
+
+  const sendQuote = (q: Quote) => {
+    const W = wordsFor(q.lang);
+    const { link, isPrivate } = customerLinkFor(q);
+    const intro = { pt: "Segue o orçamento do seu transfer", en: "Here is your transfer quote",
+                    fr: "Voici le devis de votre transfert" }[q.lang] ?? "Here is your transfer quote";
 
     const body = isPrivate
       ? quoteMessage(q)
@@ -292,7 +312,8 @@ export default function Home() {
       {view === "list" && (
         <TripList quotes={st.quotes} settings={st.settings}
                   onOpen={(id) => { const next = loadQuote(st, id); setSt(next); persist(next); setView("quote"); }}
-                  onDelete={doDelete} onPdf={savePdf} onSend={sendQuote} onPatch={patchQuote}
+                  onDelete={doDelete} onPdf={savePdf} onSend={sendQuote} onCopyLink={copyLink}
+                  onPatch={patchQuote}
                   onNew={() => { const next = newQuote(st); setSt(next); persist(next); setView("quote"); }} />
       )}
 
@@ -303,6 +324,7 @@ export default function Home() {
                 onSave={doSave}
                 onSend={() => sendQuote(saveQuote(st).ok ? (saveQuote(st) as any).quote : ({} as Quote))}
                 onPdf={() => { const r = saveQuote(st); if (r.ok) savePdf(r.quote); else say(r.message); }}
+                onCopyLink={() => { const r = saveQuote(st); if (r.ok) { setSt(r.state); persist(r.state); copyLink(r.quote); } else say(r.message); }}
                 onNewQuote={() => { const next = newQuote(st); setSt(next); persist(next); }}
                 onBack={() => setView("list")}
                 flash={flash} />

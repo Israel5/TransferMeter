@@ -15,7 +15,7 @@ const clock = (d: Date) =>
   d.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 export function Editor({
-  st, live, set, setTrip, mapsLeg, mapsRoute, quoteText, onSave, onSend, onPdf, onNewQuote, onBack, flash,
+  st, live, set, setTrip, mapsLeg, mapsRoute, quoteText, onSave, onSend, onPdf, onCopyLink, onNewQuote, onBack, flash,
 }: {
   st: AppState; live: boolean;
   set: (patch: Partial<AppState>) => void;
@@ -23,7 +23,7 @@ export function Editor({
   mapsLeg: (i: number) => string | null;
   mapsRoute: () => string | null;
   quoteText: string;
-  onSave: () => void; onSend: () => void; onPdf: () => void;
+  onSave: () => void; onSend: () => void; onPdf: () => void; onCopyLink: () => void;
   onNewQuote: () => void; onBack: () => void;
   flash: string;
 }) {
@@ -255,6 +255,7 @@ export function Editor({
               <div className="route-actions" style={{ borderTop: 0, paddingTop: 10, marginTop: 0 }}>
                 <button className="btn primary" type="button" onClick={onSend}>Send</button>
                 <button className="btn" type="button" onClick={onSave}>Save quote</button>
+                <button className="btn" type="button" onClick={onCopyLink}>Copy link</button>
                 <button className="btn" type="button" onClick={onPdf}>PDF</button>
                 <button className="btn" type="button" onClick={onNewQuote}>New quote</button>
                 <span className="unit" role="status" aria-live="polite">{flash}</span>

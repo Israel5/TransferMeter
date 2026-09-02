@@ -20,13 +20,14 @@ const known = (s: string | undefined) =>
 
 /** The name leads; everything else supports it. Detail only when asked for. */
 export function TripList({
-  quotes, settings, onOpen, onDelete, onPdf, onSend, onPatch, onNew,
+  quotes, settings, onOpen, onDelete, onPdf, onSend, onCopyLink, onPatch, onNew,
 }: {
   quotes: Quote[]; settings: Settings;
   onOpen: (id: string) => void;
   onDelete: (id: string) => void;
   onPdf: (q: Quote) => void;
   onSend: (q: Quote) => void;
+  onCopyLink: (q: Quote) => void;
   onPatch: (id: string, patch: Partial<Quote>) => void;
   onNew: () => void;
 }) {
@@ -161,6 +162,8 @@ export function TripList({
                         : null}
                     <span className="spacer" />
                     <button className="qbtn" type="button" onClick={() => onSend(q)}>Send</button>
+                    <button className="qbtn" type="button" title="Copy the customer's link"
+                            onClick={() => onCopyLink(q)}>Copy link</button>
                     <button className="qbtn" type="button" onClick={() => onOpen(q.id)}>Open</button>
                     <button className="qbtn" type="button" onClick={() => onPdf(q)}>PDF</button>
                     <button className="qbtn danger" type="button" onClick={() => onDelete(q.id)}>Delete</button>
