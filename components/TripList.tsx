@@ -32,6 +32,8 @@ function FuelRow({
   settings: Settings; onChange: (a: Actual) => void;
 }) {
   const real = fuelUsed(actual, estKm, settings);
+  // Quebec pumps advertise cents: 187.9 on the sign is $1.879 in this box.
+  const looksLikeCents = (actual?.price ?? 0) > 10;
   const set = (k: keyof Actual) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.trim();
     const v = parseFloat(raw);
@@ -39,9 +41,10 @@ function FuelRow({
     if (raw === "" || !Number.isFinite(v) || v <= 0) delete next[k]; else next[k] = v;
     onChange(next);
   };
-  const box = (k: keyof Actual, hint: number, unit: string, decimals: number, title: string) => (
+  const box = (k: keyof Actual, hint: number, unit: string, decimals: number,
+               step: string, title: string) => (
     <span className={"fuel-box" + (actual?.[k] != null ? " has" : "")}>
-      <input type="number" min="0" step="0.1" inputMode="decimal"
+      <input type="number" min="0" step={step} inputMode="decimal"
              placeholder={hint > 0 ? fmt(hint, decimals) : ""}
              aria-label={title} title={title}
              value={actual?.[k] != null ? String(actual[k]) : ""}
@@ -55,9 +58,14 @@ function FuelRow({
       <span className="lab" title="Measured from your door to your door, the whole loop including the empty legs">
         actual
       </span>
-      {box("km", estKm, "km", 1, "Kilometres actually driven, your door back to your door")}
-      {box("l100", toL100(settings.kmPerL), "L/100km", 1, "The average your dash showed")}
-      {box("price", settings.fuelPrice, "$/L", 2, "What you paid per litre")}
+      {box("km", estKm, "km", 1, "0.1", "Kilometres actually driven, your door back to your door")}
+      {box("l100", toL100(settings.kmPerL), "L/100km", 1, "0.1", "The average your dash showed")}
+      {box("price", settings.fuelPrice, "$/L", 2, "0.001", "What you paid per litre, in dollars: the pump's 187.9 is 1.879")}
+      {looksLikeCents && (
+        <span className="fuel-warn">
+          {`that looks like cents — $${fmt((actual?.price ?? 0) / 100, 3)} per litre?`}
+        </span>
+      )}
       <span className="fuel-out">
         {real ? (
           <>

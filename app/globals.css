@@ -427,6 +427,12 @@ a.link:hover{text-decoration:underline}
   background:color-mix(in srgb,var(--accent) 8%,transparent);
 }
 .fuel-box.has input,.fuel-box.has .u{color:var(--accent)}
+.fuel-warn{
+  flex:none;font-size:.76rem;color:var(--bad);
+  border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);
+  background:color-mix(in srgb,var(--bad) 8%,transparent);
+  border-radius:7px;padding:2px 8px;
+}
 .fuel-out{
   display:inline-flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-left:auto;
   font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:.8rem;
@@ -435,7 +441,13 @@ a.link:hover{text-decoration:underline}
 .qfuel.measured .fuel-out b{color:var(--accent)}
 .fuel-out .vs{font-family:inherit;font-size:.76rem;color:var(--muted)}
 @media (max-width:560px){
-  .fuel-out{margin-left:0;width:100%}
+  .fuel-warn{
+  flex:none;font-size:.76rem;color:var(--bad);
+  border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);
+  background:color-mix(in srgb,var(--bad) 8%,transparent);
+  border-radius:7px;padding:2px 8px;
+}
+.fuel-out{margin-left:0;width:100%}
   .fuel-box input{width:2.9rem}
 }
 .qacts{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
