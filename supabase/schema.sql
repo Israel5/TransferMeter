@@ -51,6 +51,14 @@ create table if not exists public.config (
   id    boolean primary key default true check (id),
   owner uuid not null references auth.users(id) on delete cascade
 );
+
+-- Shared with the request form's server route and nothing else. It is not a
+-- privilege: it only proves a request came through the route that checked
+-- Turnstile, rather than straight at the API with the public key everyone has.
+alter table public.config add column if not exists request_secret text;
+update public.config
+   set request_secret = encode(gen_random_bytes(24), 'hex')
+ where request_secret is null;
 alter table public.config enable row level security;
 drop policy if exists "owner reads config" on public.config;
 create policy "owner reads config" on public.config
@@ -107,7 +115,8 @@ revoke all on all tables in schema public from anon;
 -- A stranger may create a request and nothing else. They cannot choose the
 -- price, the status, or whose books it lands in — this function decides all
 -- three. What comes back is only the token for following their own request.
-create or replace function public.request_quote(payload jsonb)
+drop function if exists public.request_quote(jsonb);
+create or replace function public.request_quote(payload jsonb, secret text)
 returns text
 language plpgsql
 security definer
@@ -118,9 +127,17 @@ declare
   the_owner uuid;
   recent    int;
   clean     jsonb;
+  want      text;
 begin
-  select owner into the_owner from public.config where id;
+  select owner, request_secret into the_owner, want from public.config where id;
   if the_owner is null then raise exception 'no driver configured'; end if;
+
+  -- Anyone can read the anon key out of the page, so the key alone cannot say
+  -- where a request came from. This can: only the server route that verified
+  -- the Turnstile token knows it.
+  if want is null or secret is distinct from want then
+    raise exception 'that request did not come from the form';
+  end if;
 
   -- Cheap flood guard: a burst of requests in one minute is not a person.
   select count(*) into recent
@@ -172,8 +189,8 @@ begin
   return (select share_token from public.quotes where id = new_id);
 end $$;
 
-revoke all on function public.request_quote(jsonb) from public;
-grant execute on function public.request_quote(jsonb) to anon, authenticated;
+revoke all on function public.request_quote(jsonb, text) from public;
+grant execute on function public.request_quote(jsonb, text) to anon, authenticated;
 
 -- --------------------------------------------------------------- touch ------
 create or replace function public.touch_updated_at()

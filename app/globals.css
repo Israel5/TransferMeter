@@ -994,6 +994,44 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .cq-verdict.declined p{color:var(--muted)}
 .cq-verdict.declined .cq-mark{background:var(--muted)}
 
+/* the request form */
+.rq-langs{display:flex;gap:4px;flex:none}
+.rq-langs button{
+  border:1px solid color-mix(in srgb,#fff 25%,transparent);background:transparent;
+  color:var(--paper-muted);border-radius:7px;padding:3px 8px;cursor:pointer;
+  font:inherit;font-family:"Barlow Condensed",sans-serif;font-size:.68rem;
+  font-weight:600;letter-spacing:.07em;
+}
+.rq-langs button[aria-pressed="true"]{background:#fff;color:var(--slate);border-color:#fff}
+.rq-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rq-field{display:flex;flex-direction:column;gap:5px}
+.rq-field.wide{grid-column:1/-1}
+.rq-field span{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.7rem;font-weight:600;color:var(--muted);
+}
+.rq-field input{
+  border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;
+  background:var(--surface);color:var(--ink);font:inherit;font-size:.95rem;width:100%;
+}
+.rq-field input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+.rq-check{display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:.9rem}
+.rq-check input{width:18px;height:18px;accent-color:var(--accent)}
+.rq-check + .rq-fields{margin-top:12px}
+.rq-note{
+  width:100%;border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;
+  background:var(--surface);color:var(--ink);font:inherit;font-size:.95rem;resize:vertical;
+}
+.rq-note:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+.rq-turnstile{margin-bottom:14px;min-height:65px}
+.rq-send{width:100%;padding:15px;font-size:1rem}
+.rq-link{
+  font-family:"IBM Plex Mono",monospace;font-size:.82rem;word-break:break-all;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:9px;
+  padding:11px 12px;margin:0 0 12px;
+}
+@media (max-width:440px){ .rq-fields{grid-template-columns:1fr} }
+
 .cq-empty{margin-top:20vh;text-align:center;color:var(--muted)}
 .cq-empty h1{
   font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.06em;
