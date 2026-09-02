@@ -75,7 +75,7 @@ export default function Home() {
               ...prev,
               quotes: prev.quotes.map((q) => adopted.find((a) => a.id === q.id) ?? q),
             }));
-            say("A customer updated their passenger or luggage details.");
+            say("A customer answered or updated their details — your list is up to date.");
           }
           setStore("Synced");
         }

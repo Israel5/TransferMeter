@@ -100,32 +100,43 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
   };
 }
 
-/** Counts a customer corrected while this app had the quote open.
+/** What a customer did while this app had the quote open.
  *
- *  A save here writes the whole record, so without this the driver's older
- *  copy would quietly overwrite what the customer had just fixed. Only the
- *  counts can collide -- nothing else on the page is theirs to change -- and
- *  on those the customer is the authority: they are the ones who know how many
- *  suitcases they are carrying. So their numbers win, everything else is the
- *  driver's, and neither side sees an error. */
+ *  A save here writes the whole record, so without this the driver's older copy
+ *  would quietly undo it. Two things are theirs to change and neither may be
+ *  lost: the counts, where they are the authority because they know what they
+ *  are carrying, and their answer, which is the entire point of the link.
+ *  Everything else on the record stays the driver's. */
 async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Quote[]> {
   const ids = quotes.map((q) => q.id).filter(Boolean);
   if (!ids.length) return quotes;
 
-  const { data, error } = await sb.from("quotes").select("id,data").in("id", ids);
+  const { data, error } = await sb.from("quotes").select("id,status,data").in("id", ids);
   if (error || !data) return quotes;          // never block a save on this
 
-  const remote = new Map<string, Quote>();
-  data.forEach((r: { id: string; data: Quote }) => { if (r?.data) remote.set(r.id, r.data); });
+  type Row = { id: string; status: string | null; data: Quote };
+  const remote = new Map<string, Row>();
+  data.forEach((r: Row) => { if (r?.data) remote.set(r.id, r); });
 
   return quotes.map((q) => {
-    const r = remote.get(q.id);
-    const theirs = r?.customerEditedAt;
-    if (!theirs) return q;
-    // Only defer to an edit this copy has not already seen.
-    if (q.customerEditedAt && q.customerEditedAt >= theirs) return q;
-    return { ...q, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
-             customerEditedAt: theirs };
+    const row = remote.get(q.id);
+    if (!row) return q;
+    const r = row.data;
+    let next = q;
+
+    // An answer only ever arrives from the customer, so a stored one outranks
+    // whatever this copy was holding. The column is the authoritative one.
+    const answered = row.status ?? r.status;
+    if ((answered === "approved" || answered === "declined") && q.status !== answered) {
+      next = { ...next, status: answered as Quote["status"] };
+    }
+
+    const theirs = r.customerEditedAt;
+    if (theirs && !(q.customerEditedAt && q.customerEditedAt >= theirs)) {
+      next = { ...next, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
+               customerEditedAt: theirs };
+    }
+    return next;
   });
 }
 
