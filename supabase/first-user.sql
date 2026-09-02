@@ -1,9 +1,8 @@
 -- Self-provisioning, then closed.
 --
--- The app lets you create your account from the sign-in screen, so there is no
--- dashboard step. This makes that safe on a public URL: the first account to be
--- created becomes the owner, and every attempt after it is refused. Nobody who
--- finds the site can register.
+-- The first account created becomes the owner and is written into config, and
+-- every attempt after it is refused. Nobody who finds the site can register,
+-- whether the account is made here or in the dashboard.
 
 create or replace function public.claim_first_account()
 returns trigger

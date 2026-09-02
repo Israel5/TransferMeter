@@ -20,17 +20,24 @@ export function getClient(cfg: PublicConfig["supabase"]) {
   return client;
 }
 
-/** A magic link: no password is ever created, stored or handled.
+/** Sign in with a password.
  *
- *  Creating an account is allowed, because a database trigger lets only the
- *  first one through and refuses every attempt after it. That makes the app
- *  self-provisioning without leaving open registration on a public URL. */
-export async function sendMagicLink(sb: SupabaseClient, email: string) {
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
-  });
-  if (error) throw new Error(error.message);
+ *  Deliberately not a magic link: that would email the driver from Supabase,
+ *  with Supabase's branding, to sign in to their own application. Nothing
+ *  about the login should reveal, or depend on, who hosts the database. */
+export async function signIn(sb: SupabaseClient, email: string, password: string) {
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    throw new Error(
+      /invalid login/i.test(error.message)
+        ? "That email and password don't match."
+        : error.message,
+    );
+  }
+}
+
+export async function signOut(sb: SupabaseClient) {
+  await sb.auth.signOut();
 }
 
 function rowFrom(q: Quote, owner: string) {

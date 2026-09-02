@@ -16,7 +16,7 @@ import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
-import { getClient, pull, push, removeQuote, sendMagicLink, type PublicConfig } from "@/lib/supabase";
+import { getClient, pull, push, removeQuote, signIn, signOut, type PublicConfig } from "@/lib/supabase";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
 
 const LOCAL_KEY = "transfer-meter-v3";
@@ -32,6 +32,7 @@ export default function Home() {
   const [store, setStore] = useState("This browser");
   const [flash, setFlash] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [signInMsg, setSignInMsg] = useState<{ text: string; good?: boolean }>({ text: "" });
 
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -217,25 +218,30 @@ export default function Home() {
   if (!booted) return <div className="wrap" />;
 
   if (sb && !owner) {
+    const go = async () => {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
+        setSignInMsg({ text: "That doesn't look like an email address." }); return;
+      }
+      if (!password) { setSignInMsg({ text: "Enter your password." }); return; }
+      setSignInMsg({ text: "Signing in…" });
+      try {
+        await signIn(sb, email.trim(), password);
+        setPassword("");
+        location.reload();
+      } catch (e) { setSignInMsg({ text: (e as Error).message }); }
+    };
     return (
       <div className="wrap">
         <div className="signin">
           <h2>Transfer Meter</h2>
-          <p>
-            Enter your email and we&apos;ll send you a link — no password to remember.
-            The first account created becomes the owner; after that, sign-up closes.
-          </p>
-          <input type="email" inputMode="email" autoComplete="email" placeholder="you@example.com"
-                 value={email} onChange={(e) => setEmail(e.target.value)} />
-          <button className="btn primary" type="button" onClick={async () => {
-            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
-              setSignInMsg({ text: "That doesn't look like an email address." }); return;
-            }
-            setSignInMsg({ text: "Sending…" });
-            try { await sendMagicLink(sb, email.trim());
-                  setSignInMsg({ text: `Check ${email.trim()} and open the link on this device.`, good: true }); }
-            catch (e) { setSignInMsg({ text: (e as Error).message }); }
-          }}>Email me a link</button>
+          <p>Sign in to see your trips.</p>
+          <input type="email" inputMode="email" autoComplete="username" placeholder="you@example.com"
+                 value={email} onChange={(e) => setEmail(e.target.value)}
+                 onKeyDown={(e) => { if (e.key === "Enter") go(); }} />
+          <input type="password" autoComplete="current-password" placeholder="Password"
+                 value={password} onChange={(e) => setPassword(e.target.value)}
+                 onKeyDown={(e) => { if (e.key === "Enter") go(); }} />
+          <button className="btn primary" type="button" onClick={go}>Sign in</button>
           <p className={"msg" + (signInMsg.good ? " good" : signInMsg.text ? " bad" : "")}>{signInMsg.text}</p>
         </div>
       </div>
