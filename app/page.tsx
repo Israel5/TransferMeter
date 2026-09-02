@@ -197,6 +197,12 @@ export default function Home() {
     say("PDF downloaded.");
   };
 
+  /** Sending is what makes a quote sent; the status should not rely on memory. */
+  const markSent = (q: Quote) => {
+    const st = q.status ?? "draft";
+    if (st === "draft" || st === "requested") patchQuote(q.id, { status: "sent" });
+  };
+
   const sendQuote = (q: Quote) => {
     const W = wordsFor(q.lang);
     const base = (st.settings.customerPage ?? "").trim().replace(/[#?].*$/, "")
@@ -210,8 +216,16 @@ export default function Home() {
       : `${intro}${q.quoteNo ? ` (${W.no} ${q.quoteNo})` : ""}:\n${base}#q=${encodePayload(customerPayload(q, st.settings, (v) => waDigits(v, st.settings)))}`;
 
     const wa = waLink(q.contact, body, st.settings);
-    if (wa) { window.open(wa, "_blank", "noopener"); say(isPrivate ? "Sent as a message — no public quote page yet." : "Opening WhatsApp."); return; }
-    navigator.clipboard.writeText(body).then(() => say("Copied."), () => say("Copy it from the quote box."));
+    if (wa) {
+      window.open(wa, "_blank", "noopener");
+      markSent(q);
+      say(isPrivate ? "Sent as a message — the approve page isn't public from here." : "Opening WhatsApp.");
+      return;
+    }
+    navigator.clipboard.writeText(body).then(
+      () => { markSent(q); say("Copied — paste it to your customer."); },
+      () => say("Copy it from the quote box."),
+    );
   };
 
   /* ---------- render ---------- */
