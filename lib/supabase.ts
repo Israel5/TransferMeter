@@ -55,20 +55,26 @@ export async function signOut(sb: SupabaseClient) {
 
 function rowFrom(q: Quote, owner: string, customerView?: unknown) {
   const dated = (q.trips ?? []).map((t) => t.date).filter(Boolean).sort();
+  // The status is deliberately absent, here and inside data. A save carries
+  // the content of a quote; the status is changed by an act -- the driver
+  // pressing the pill, or a customer answering -- and only those write it.
+  // Leaving it out of the bulk save is what makes it impossible to clobber:
+  // an omitted column keeps its stored value on update, and takes the table
+  // default of 'draft' on insert, which is what a new quote is anyway.
+  const { status: _drop, ...content } = q;
   return {
     id: q.id, owner,
     quote_no: q.quoteNo || null,
     customer: q.customer || null,
     contact: q.contact || null,
     notes: q.notes || null,
-    status: q.status || "draft",
     origin: q.origin ?? "driver",
     first_date: dated[0] || null,
     price: Number(q.price) || 0,
     tip: (q.trips ?? []).reduce((n, t) => n + (Number(t.tip) || 0), 0),
     cost: Number(q.cost) || 0,
     total_km: Number(q.totalKm) || 0,
-    data: q,
+    data: content,
     // What the customer is allowed to see, decided here rather than in SQL.
     ...(customerView ? { customer_view: customerView } : {}),
   };
@@ -76,7 +82,7 @@ function rowFrom(q: Quote, owner: string, customerView?: unknown) {
 
 export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null> {
   const [{ data: rows, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
-    sb.from("quotes").select("data,share_token").order("seq", { ascending: false }),
+    sb.from("quotes").select("data,status,share_token").order("seq", { ascending: false }),
     sb.from("settings").select("data,draft").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
@@ -94,50 +100,44 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
     // for a customer and should not travel inside exported data.
     quotes: dedupeQuotes(
       (rows ?? [])
-        .map((r: any) => (r.data ? { ...r.data, shareToken: r.share_token } : null))
+        .map((r: any) => (r.data ? { ...r.data, status: r.status ?? "draft", shareToken: r.share_token } : null))
         .filter(Boolean) as Quote[],
     ),
   };
 }
 
-/** What a customer did while this app had the quote open.
+/** Counts a customer corrected while this app had the quote open.
  *
- *  A save here writes the whole record, so without this the driver's older copy
- *  would quietly undo it. Two things are theirs to change and neither may be
- *  lost: the counts, where they are the authority because they know what they
- *  are carrying, and their answer, which is the entire point of the link.
- *  Everything else on the record stays the driver's. */
+ *  A save writes the whole content of a quote, so without this the driver's
+ *  older copy would quietly undo the correction. The customer is the authority
+ *  on what they are carrying, so their numbers win and everything else stays
+ *  the driver's. The status needs no such rule: it is not part of a save. */
 async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Quote[]> {
   const ids = quotes.map((q) => q.id).filter(Boolean);
   if (!ids.length) return quotes;
 
-  const { data, error } = await sb.from("quotes").select("id,status,data").in("id", ids);
+  const { data, error } = await sb.from("quotes").select("id,data").in("id", ids);
   if (error || !data) return quotes;          // never block a save on this
 
-  type Row = { id: string; status: string | null; data: Quote };
-  const remote = new Map<string, Row>();
-  data.forEach((r: Row) => { if (r?.data) remote.set(r.id, r); });
+  const remote = new Map<string, Quote>();
+  data.forEach((r: { id: string; data: Quote }) => { if (r?.data) remote.set(r.id, r.data); });
 
   return quotes.map((q) => {
-    const row = remote.get(q.id);
-    if (!row) return q;
-    const r = row.data;
-    let next = q;
-
-    // An answer only ever arrives from the customer, so a stored one outranks
-    // whatever this copy was holding. The column is the authoritative one.
-    const answered = row.status ?? r.status;
-    if ((answered === "approved" || answered === "declined") && q.status !== answered) {
-      next = { ...next, status: answered as Quote["status"] };
-    }
-
-    const theirs = r.customerEditedAt;
-    if (theirs && !(q.customerEditedAt && q.customerEditedAt >= theirs)) {
-      next = { ...next, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
-               customerEditedAt: theirs };
-    }
-    return next;
+    const r = remote.get(q.id);
+    const theirs = r?.customerEditedAt;
+    if (!theirs) return q;
+    if (q.customerEditedAt && q.customerEditedAt >= theirs) return q;   // already seen
+    return { ...q, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
+             customerEditedAt: theirs };
   });
+}
+
+/** Changing a status is an act, not a side effect of saving, so it is its own
+ *  write. Whoever does it last means it -- the driver reversing an approval a
+ *  customer just gave included. */
+export async function setQuoteStatus(sb: SupabaseClient, id: string, status: string) {
+  const { error } = await sb.from("quotes").update({ status }).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
 export async function push(

@@ -229,16 +229,14 @@ begin
     raise exception 'answer must be approved or declined';
   end if;
 
-  -- The status lives twice: a column the database can filter on, and a copy
-  -- inside data, which is what the driver's app actually reads and writes back.
-  -- Setting only the column leaves the answer invisible to them, and their next
-  -- save would overwrite it with the stale value.
+  -- The status lives in this column and nowhere else. It used to be copied
+  -- into data as well, the two drifted, and an answer that reached only one of
+  -- them was either invisible or silently overwritten. The driver's app reads
+  -- this column now, and its saves do not carry a status at all.
   update public.quotes
      set status      = answer,
          answered_at = now(),
-         updated_at  = now(),
-         data        = data || jsonb_build_object('status', answer,
-                                                  'answeredAt', to_jsonb(now()))
+         updated_at  = now()
    where share_token = token
      and status in ('sent','approved','declined')   -- never a draft or a request
   returning * into q;

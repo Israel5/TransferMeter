@@ -16,7 +16,7 @@ import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
-import { getClient, pull, push, removeQuote, rotateShareToken, signIn } from "@/lib/supabase";
+import { getClient, pull, push, setQuoteStatus, removeQuote, rotateShareToken, signIn } from "@/lib/supabase";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
@@ -176,6 +176,12 @@ export default function Home() {
       const next = { ...prev, quotes: prev.quotes.map((q) => (q.id === id ? { ...q, ...patch } : q)) };
       persist(next); return next;
     });
+    // A status change is its own write: saves no longer carry one, so that
+    // nothing can undo an answer by accident and nothing can stop you undoing
+    // one on purpose.
+    if (patch.status && sb && owner) {
+      setQuoteStatus(sb, id, patch.status).catch(() => setStore("Not saved"));
+    }
   };
 
   const doDelete = async (id: string) => {
