@@ -450,6 +450,25 @@ a.link:hover{text-decoration:underline}
 .fuel-out{margin-left:0;width:100%}
   .fuel-box input{width:2.9rem}
 }
+/* What the job came to, once the legs above are settled. */
+.qtotals{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  padding:8px 10px;border-top:1px solid var(--line);margin-top:2px;
+}
+.qtotals .k{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.68rem;font-weight:600;color:var(--muted);flex:none;min-width:3.4rem;
+}
+.qtotals .n{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:.84rem;
+}
+.qtotals .n.plus{color:var(--good)}
+.qtotals .n.minus{color:var(--muted)}
+.qtotals .n.keep{font-weight:600}
+.qtotals.measured .n.keep{color:var(--accent)}
+.qtotals .src{margin-left:auto;font-size:.74rem;color:var(--muted)}
+.qtotals .src + .src{margin-left:0}
+@media (max-width:560px){.qtotals .src{margin-left:0;width:100%}}
 .qacts{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .qacts .spacer{flex:1}
 .qbtn{

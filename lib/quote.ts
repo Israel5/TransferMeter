@@ -212,6 +212,28 @@ export function legCost(t: SavedTrip, s: Settings) {
   return { est, cost: real ? real.cost : est, real };
 }
 
+/** What a whole job came to: charged, tips, fuel, and what is left. Fuel
+ *  follows the pump on legs you measured and the estimate on the rest, so a
+ *  half-measured round trip still totals honestly. */
+export function quoteTotals(q: Quote, s: Settings) {
+  let charged = 0, tips = 0, fuel = 0, estFuel = 0, measured = 0, km = 0;
+  const legs = q.trips ?? [];
+  legs.forEach((t) => {
+    charged += Number(t.price) || 0;
+    tips += Number(t.tip) || 0;
+    const c = legCost(t, s);
+    fuel += c.cost; estFuel += c.est;
+    km += c.real?.km ?? (Number(t.totalKm) || 0);
+    if (c.real) measured++;
+  });
+  return {
+    charged, tips, fuel, estFuel, km,
+    kept: charged + tips - fuel,
+    measured, legs: legs.length,
+    allMeasured: legs.length > 0 && measured === legs.length,
+  };
+}
+
 /** Your real consumption across every ride where you read the dash, weighted
  *  by distance so a long trip counts for more than a short one. This is the
  *  number the settings default is guessing at. */

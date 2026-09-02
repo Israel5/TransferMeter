@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fmt, money, fuelUsed, legCost, toL100, shortName, shortDay } from "@/lib/quote";
+import { fmt, money, fuelUsed, quoteTotals, toL100, shortName, shortDay } from "@/lib/quote";
 import { owedOn, tipTotal } from "@/lib/state";
 import { waLink, waHandle, waPretty } from "@/lib/whatsapp";
 import type { Actual, Quote, Settings } from "@/lib/types";
@@ -235,6 +235,31 @@ export function TripList({
                     </div>
                     );
                   })}
+
+                  {(() => {
+                    const tot = quoteTotals(q, settings);
+                    return (
+                      <div className={"qtotals" + (tot.measured > 0 ? " measured" : "")}>
+                        <span className="k">This job</span>
+                        <span className="n">${fmt(tot.charged, 0)} charged</span>
+                        {tot.tips > 0 && <span className="n plus">+${fmt(tot.tips, 0)} tip</span>}
+                        <span className="n minus">−{money(tot.fuel)} fuel</span>
+                        <span className="n keep">{money(tot.kept)} kept</span>
+                        <span className="src">
+                          {tot.measured === 0
+                            ? `estimated · ${fmt(tot.km, 0)} km`
+                            : tot.allMeasured
+                              ? `measured · ${fmt(tot.km, 0)} km driven`
+                              : `${tot.measured} of ${tot.legs} legs measured · ${fmt(tot.km, 0)} km`}
+                        </span>
+                        {tot.measured > 0 && Math.abs(tot.fuel - tot.estFuel) >= 0.005 && (
+                          <span className="src">
+                            {`estimate said ${money(tot.estFuel)}`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <textarea className="qnote" placeholder="Private notes about this trip or customer…"
                             aria-label={`Notes for ${q.customer || "this quote"}`}
