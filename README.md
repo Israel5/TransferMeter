@@ -6,8 +6,12 @@ quote. Built with Next.js.
 
 ```sh
 npm install
-npm run dev          # http://localhost:3001
+npm run dev          # http://localhost:3001, reloads as you edit
 ```
+
+`npm run dev` recompiles on save. `npm run build && npm run start` runs the
+production build instead, which is what Vercel serves but needs a restart for
+every change.
 
 ## What it does
 
