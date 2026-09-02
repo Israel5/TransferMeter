@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { decodePayload } from "@/lib/message";
+import { getClient, fetchQuoteByToken, answerQuote, type PublicConfig } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 /* The quote travels inside the link. This page stores nothing and knows nothing
    on its own — open it without a link and there is simply no quote. */
@@ -20,21 +22,33 @@ const T = {
         ask: "Está tudo certo com este orçamento?", yes: "Aprovar", no: "Recusar",
         foot: "Ao tocar num botão abre o WhatsApp com a resposta pronta — é só enviar.",
         okMsg: "Olá! Aprovo o orçamento", noMsg: "Olá! Infelizmente não vou seguir com o orçamento",
-        none: "Nenhum orçamento neste link", noneSub: "Peça um novo link ao seu motorista." },
+        none: "Nenhum orçamento neste link", noneSub: "Peça um novo link ao seu motorista.",
+        thanksYes: "Obrigado! O seu transfer está confirmado.",
+        thanksNo: "Tudo bem — o motorista foi avisado.",
+        already: "Já respondido", sending: "A enviar…",
+        failed: "Não foi possível registar a sua resposta. Tente novamente." },
   en: { title: "Transfer quote", forWhom: "Prepared for", quote: "Quote no.",
         out: "Outbound", ret: "Return", at: "at", total: "Total",
         pax: "Passengers", gear: "Child seats", bags: "Luggage",
         ask: "Does this quote look right?", yes: "Approve", no: "Decline",
         foot: "Tapping a button opens WhatsApp with your reply ready — just send it.",
         okMsg: "Hello! I approve quote", noMsg: "Hello! I won't be going ahead with quote",
-        none: "No quote in this link", noneSub: "Ask your driver for a new link." },
+        none: "No quote in this link", noneSub: "Ask your driver for a new link.",
+        thanksYes: "Thank you — your transfer is confirmed.",
+        thanksNo: "No problem — your driver has been told.",
+        already: "Already answered", sending: "Sending…",
+        failed: "That didn't go through. Please try again." },
   fr: { title: "Devis de transfert", forWhom: "Préparé pour", quote: "Devis nº",
         out: "Aller", ret: "Retour", at: "à", total: "Total",
         pax: "Passagers", gear: "Sièges enfant", bags: "Bagages",
         ask: "Ce devis vous convient-il ?", yes: "Approuver", no: "Refuser",
         foot: "Le bouton ouvre WhatsApp avec votre réponse prête — il suffit de l'envoyer.",
         okMsg: "Bonjour ! J'approuve le devis", noMsg: "Bonjour ! Je ne donnerai pas suite au devis",
-        none: "Aucun devis dans ce lien", noneSub: "Demandez un nouveau lien à votre chauffeur." },
+        none: "Aucun devis dans ce lien", noneSub: "Demandez un nouveau lien à votre chauffeur.",
+        thanksYes: "Merci — votre transfert est confirmé.",
+        thanksNo: "Très bien — votre chauffeur est prévenu.",
+        already: "Déjà répondu", sending: "Envoi…",
+        failed: "L'envoi a échoué. Réessayez." },
 };
 
 const money = (n: number) => "$" + Number(n ?? 0).toLocaleString("en-CA", { maximumFractionDigits: 0 });
@@ -53,19 +67,50 @@ function niceDate(iso: string, lang: string) {
 export default function CustomerQuote() {
   const [q, setQ] = useState<Payload | null>(null);
   const [ready, setReady] = useState(false);
+  const [sb, setSb] = useState<SupabaseClient | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const read = () => {
-      try {
-        const m = window.location.hash.replace(/^#/, "").match(/(?:^|&)q=([^&]+)/);
-        setQ(m ? (decodePayload(m[1]) as Payload) : null);
-      } catch { setQ(null); }
+    (async () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      const t = hash.match(/(?:^|&)t=([^&]+)/)?.[1] ?? null;
+      const payload = hash.match(/(?:^|&)q=([^&]+)/)?.[1] ?? null;
+
+      if (t) {
+        // The quote lives in the database; read the current version so a price
+        // changed after sending is the one they actually see.
+        try {
+          const cfg: PublicConfig = await fetch("/api/config", { cache: "no-store" }).then((r) => r.json());
+          const client = getClient(cfg.supabase);
+          if (client) {
+            setSb(client);
+            setToken(t);
+            const row = await fetchQuoteByToken(client, t);
+            if (row) {
+              setQ(row as Payload);
+              setStatus((row as { status?: string }).status ?? null);
+            }
+          }
+        } catch { /* falls through to the empty state */ }
+      } else if (payload) {
+        try { setQ(decodePayload(payload) as Payload); } catch { /* empty state */ }
+      }
       setReady(true);
-    };
-    read();
-    window.addEventListener("hashchange", read);
-    return () => window.removeEventListener("hashchange", read);
+    })();
   }, []);
+
+  const answer = async (choice: "approved" | "declined") => {
+    if (!sb || !token || busy) return;
+    setBusy(true); setFailed(false);
+    try {
+      const r = await answerQuote(sb, token, choice);
+      setStatus(r.status);
+    } catch { setFailed(true); }
+    finally { setBusy(false); }
+  };
 
   if (!ready) return <div className="wrap" />;
 
@@ -90,6 +135,8 @@ export default function CustomerQuote() {
     return q.w ? `https://wa.me/${q.w}?text=${encodeURIComponent(msg)}`
                : `https://wa.me/?text=${encodeURIComponent(msg)}`;
   };
+
+  const answered = status === "approved" || status === "declined";
 
   return (
     <div className="wrap" style={{ maxWidth: "33rem" }}>
@@ -147,12 +194,34 @@ export default function CustomerQuote() {
       </div>
 
       <div className="ask">
-        <p>{L.ask}</p>
-        <div className="choice">
-          <a className="yes" href={reply(L.okMsg)} target="_blank" rel="noopener">{L.yes}</a>
-          <a className="no" href={reply(L.noMsg)} target="_blank" rel="noopener">{L.no}</a>
-        </div>
-        <p className="note">{L.foot}</p>
+        {answered ? (
+          <div className={"answered " + status}>
+            <p className="verdict">{status === "approved" ? L.thanksYes : L.thanksNo}</p>
+          </div>
+        ) : (
+          <>
+            <p>{L.ask}</p>
+            <div className="choice">
+              {token ? (
+                <>
+                  <button className="yes" type="button" disabled={busy} onClick={() => answer("approved")}>
+                    {busy ? L.sending : L.yes}
+                  </button>
+                  <button className="no" type="button" disabled={busy} onClick={() => answer("declined")}>
+                    {L.no}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <a className="yes" href={reply(L.okMsg)} target="_blank" rel="noopener">{L.yes}</a>
+                  <a className="no" href={reply(L.noMsg)} target="_blank" rel="noopener">{L.no}</a>
+                </>
+              )}
+            </div>
+            {failed && <p className="note bad">{L.failed}</p>}
+            {!token && <p className="note">{L.foot}</p>}
+          </>
+        )}
       </div>
     </div>
   );

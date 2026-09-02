@@ -737,3 +737,27 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .no{background:transparent;border-color:var(--line-2);color:var(--muted)}
 .no:hover{border-color:var(--bad);color:var(--bad)}
 .note{color:var(--muted);font-size:.78rem;line-height:1.5;margin:16px 0 0;text-align:center}
+
+/* The customer's answer, once it has been recorded. */
+.answered{
+  border:1px solid color-mix(in srgb,var(--good) 40%,transparent);
+  background:color-mix(in srgb,var(--good) 10%,transparent);
+  border-radius:11px;padding:16px 18px;
+}
+.answered.declined{
+  border-color:color-mix(in srgb,var(--muted) 40%,transparent);
+  background:color-mix(in srgb,var(--muted) 10%,transparent);
+}
+.answered .verdict{
+  margin:0;font-size:1rem;font-weight:600;color:var(--good);
+}
+.answered.declined .verdict{color:var(--muted)}
+.choice button{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+  font-weight:700;font-size:1rem;border:1.5px solid;border-radius:11px;padding:14px 12px;cursor:pointer;
+}
+.choice button:disabled{opacity:.6;cursor:default}
+.choice button.yes{background:var(--good);border-color:var(--good);color:#fff}
+.choice button.no{background:transparent;border-color:var(--line-2);color:var(--muted)}
+.choice button.no:hover:not(:disabled){border-color:var(--bad);color:var(--bad)}
+.note.bad{color:var(--bad)}

@@ -57,6 +57,8 @@ export type Quote = {
   trips: SavedTrip[];
   pax: Counts; gear: Counts; bags: Counts;
   totalKm: number; cost: number; price: number; mins: number; keep: number;
+  /** Addresses this quote for a customer. Lives on the row, not in the data. */
+  shareToken?: string;
 };
 
 export type Lang = "pt" | "en" | "fr";

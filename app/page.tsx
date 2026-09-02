@@ -79,7 +79,11 @@ export default function Home() {
     pushTimer.current = setTimeout(async () => {
       if (sb && owner) {
         setStore("Saving…");
-        try { await push(sb, owner, next); setStore("Synced"); }
+        try {
+          await push(sb, owner, next, (q) =>
+            customerPayload(q, next.settings, (v) => waDigits(v, next.settings)));
+          setStore("Synced");
+        }
         catch (e) { setStore("Not saved"); }
       } else {
         try { localStorage.setItem(LOCAL_KEY, JSON.stringify(next)); } catch {}
@@ -211,9 +215,16 @@ export default function Home() {
     const intro = { pt: "Segue o orçamento do seu transfer", en: "Here is your transfer quote",
                     fr: "Voici le devis de votre transfert" }[q.lang] ?? "Here is your transfer quote";
 
+    // A token addresses the quote in the database, so the customer's answer can
+    // be written straight back. Without one — no backend — the quote itself
+    // travels in the link instead, and they reply by message.
+    const link = q.shareToken
+      ? `${base}#t=${q.shareToken}`
+      : `${base}#q=${encodePayload(customerPayload(q, st.settings, (v) => waDigits(v, st.settings)))}`;
+
     const body = isPrivate
       ? quoteMessage(q)
-      : `${intro}${q.quoteNo ? ` (${W.no} ${q.quoteNo})` : ""}:\n${base}#q=${encodePayload(customerPayload(q, st.settings, (v) => waDigits(v, st.settings)))}`;
+      : `${intro}${q.quoteNo ? ` (${W.no} ${q.quoteNo})` : ""}:\n${link}`;
 
     const wa = waLink(q.contact, body, st.settings);
     if (wa) {

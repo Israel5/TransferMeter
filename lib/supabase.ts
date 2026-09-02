@@ -40,7 +40,7 @@ export async function signOut(sb: SupabaseClient) {
   await sb.auth.signOut();
 }
 
-function rowFrom(q: Quote, owner: string) {
+function rowFrom(q: Quote, owner: string, customerView?: unknown) {
   const dated = (q.trips ?? []).map((t) => t.date).filter(Boolean).sort();
   return {
     id: q.id, owner,
@@ -56,12 +56,14 @@ function rowFrom(q: Quote, owner: string) {
     cost: Number(q.cost) || 0,
     total_km: Number(q.totalKm) || 0,
     data: q,
+    // What the customer is allowed to see, decided here rather than in SQL.
+    ...(customerView ? { customer_view: customerView } : {}),
   };
 }
 
 export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null> {
   const [{ data: rows, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
-    sb.from("quotes").select("data").order("seq", { ascending: false }),
+    sb.from("quotes").select("data,share_token").order("seq", { ascending: false }),
     sb.from("settings").select("data,draft").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
@@ -75,13 +77,26 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
     ...draft,
     settings: { ...DEFAULTS, ...((cfg?.data ?? {}) as Settings) },
     learned,
-    quotes: dedupeQuotes((rows ?? []).map((r: any) => r.data).filter(Boolean)),
+    // The token lives on the row, not in the snapshot: it addresses the quote
+    // for a customer and should not travel inside exported data.
+    quotes: dedupeQuotes(
+      (rows ?? [])
+        .map((r: any) => (r.data ? { ...r.data, shareToken: r.share_token } : null))
+        .filter(Boolean) as Quote[],
+    ),
   };
 }
 
-export async function push(sb: SupabaseClient, owner: string, st: AppState) {
+export async function push(
+  sb: SupabaseClient,
+  owner: string,
+  st: AppState,
+  viewOf?: (q: Quote) => unknown,
+) {
   if (st.quotes.length) {
-    const { error } = await sb.from("quotes").upsert(st.quotes.map((q) => rowFrom(q, owner)), { onConflict: "id" });
+    const { error } = await sb
+      .from("quotes")
+      .upsert(st.quotes.map((q) => rowFrom(q, owner, viewOf?.(q))), { onConflict: "id" });
     if (error) throw new Error(error.message);
   }
   const { error: e2 } = await sb.from("settings").upsert(
@@ -110,6 +125,20 @@ export async function push(sb: SupabaseClient, owner: string, st: AppState) {
 export async function removeQuote(sb: SupabaseClient, id: string) {
   const { error } = await sb.from("quotes").delete().eq("id", id);
   if (error) throw new Error(error.message);
+}
+
+/** Read one quote as a customer would, using only the public key. */
+export async function fetchQuoteByToken(sb: SupabaseClient, token: string) {
+  const { data, error } = await sb.rpc("quote_by_token", { token });
+  if (error) throw new Error(error.message);
+  return data as Record<string, unknown> | null;
+}
+
+/** Record their answer. Postgres decides whether it is allowed. */
+export async function answerQuote(sb: SupabaseClient, token: string, answer: "approved" | "declined") {
+  const { data, error } = await sb.rpc("answer_quote", { token, answer });
+  if (error) throw new Error(error.message);
+  return data as { status: string; answered_at: string };
 }
 
 export type { Session };
