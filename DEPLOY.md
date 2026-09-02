@@ -48,6 +48,20 @@ psql "$SUPABASE_DB_URL" -f supabase/schema.sql
 ```
 
 
+## Signing in
+
+The app uses a password, not an emailed link, so nothing about logging in shows
+the customer or the driver who hosts the database.
+
+To set or change it:
+
+```sh
+node scripts/set-password.mjs
+```
+
+It prompts on your machine with the input hidden and writes it through the admin
+API. Nothing is emailed and the service key never leaves your laptop.
+
 ## Moving the old quotes across
 
 The previous version kept everything in `data.db`. Once your account exists:
