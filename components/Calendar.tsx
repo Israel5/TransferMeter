@@ -1,19 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { fmt, money, niceDate, shortName } from "@/lib/quote";
+import { fmt, money, legCost, toL100, niceDate, shortName } from "@/lib/quote";
 import { waLink } from "@/lib/whatsapp";
 import type { Quote, Settings } from "@/lib/types";
 
 type Leg = {
   date: string; time: string; status: string; contact: string;
   customer: string; quoteNo: string; label: string;
-  km: number; price: number; cost: number; tip: number; paid: boolean;
+  km: number; price: number; cost: number; estCost: number; measured: boolean;
+  tip: number; paid: boolean;
   from: string; to: string; quoteId: string; legIndex: number;
 };
 
 /** Works in legs, not quotes: a round trip appears on both of its days. */
-function bookedLegs(quotes: Quote[], includePending: boolean): Leg[] {
+function bookedLegs(quotes: Quote[], settings: Settings, includePending: boolean): Leg[] {
   const out: Leg[] = [];
   quotes.forEach((q) => {
     const st = q.status ?? "draft";
@@ -26,7 +27,10 @@ function bookedLegs(quotes: Quote[], includePending: boolean): Leg[] {
       out.push({
         date: t.date, time: t.time || "", status: st, contact: q.contact ?? "",
         customer: q.customer || "(no name)", quoteNo: q.quoteNo ?? "", label: t.label,
-        km: t.totalKm ?? 0, price: t.price ?? 0, cost: t.cost ?? 0,
+        km: t.actual?.km ?? t.totalKm ?? 0, price: t.price ?? 0,
+        // Profit follows the pump where a reading exists, the estimate otherwise.
+        cost: legCost(t, settings).cost, estCost: t.cost ?? 0,
+        measured: !!legCost(t, settings).real,
         tip: t.tip ?? 0, paid: !!t.paid,
         from: named[0] ?? "—", to: named[named.length - 1] ?? "—",
         quoteId: q.id, legIndex: i,
@@ -47,7 +51,7 @@ export function Calendar({
   const [pick, setPick] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  const legs = bookedLegs(quotes, pending);
+  const legs = bookedLegs(quotes, settings, pending);
   const mk = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
   const inMonth = legs.filter((l) => l.date.slice(0, 7) === mk);
   const shown = pick ? inMonth.filter((l) => l.date === pick) : inMonth;
@@ -60,6 +64,7 @@ export function Calendar({
     n: a.n + 1, price: a.price + l.price, cost: a.cost + l.cost, tip: a.tip + l.tip,
   }), { n: 0, price: 0, cost: 0, tip: 0 });
   const took = sum.price + sum.tip;
+  const nMeasured = shown.filter((l) => l.measured).length;
 
   // Local date, never UTC: otherwise the wrong day lights up every evening.
   const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -140,7 +145,10 @@ export function Calendar({
             )}
             <div className="tile fuel"><span className="k">Fuel</span>
               <div className="v">−{money(sum.cost)}</div>
-              <div className="sub">{fmt(sum.km, 0)} km driven</div></div>
+              <div className="sub">
+                {`${fmt(sum.km, 0)} km driven`}
+                {nMeasured > 0 && ` · ${nMeasured} of ${sum.n} measured`}
+              </div></div>
             <div className="tile keep"><span className="k">Kept after fuel</span>
               <div className="v">{money(took - sum.cost)}</div>
               <div className="sub">{took > 0 ? `${Math.round(((took - sum.cost) / took) * 100)}% of ${money(took)} taken in` : ""}</div></div>
@@ -152,8 +160,10 @@ export function Calendar({
           </div>
 
           <p className="note">
-            {`Fuel is the only cost counted here — ${fmt(settings.kmPerL, 1)} km/L at ${money(settings.fuelPrice)}/L. `}
-            {"Insurance, maintenance, tyres and tax are not."}
+            {nMeasured === sum.n && sum.n > 0
+              ? "Fuel here is what you actually burned, read off the car. "
+              : `Fuel is estimated at ${fmt(settings.kmPerL, 1)} km/L (${fmt(toL100(settings.kmPerL), 1)} L/100 km) at ${money(settings.fuelPrice)}/L${nMeasured > 0 ? ", except where you recorded a reading" : ""}. `}
+            {"It is the only cost counted — insurance, maintenance, tyres and tax are not."}
             {all.n > 0 && `  All time: ${money(all.price)} charged${all.tip > 0 ? ` plus ${money(all.tip)} in tips` : ""}, ${money(all.price + all.tip - all.cost)} kept over ${all.n} transfers.`}
           </p>
 

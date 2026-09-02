@@ -121,11 +121,13 @@ export function saveQuote(st: AppState): SaveResult {
     snap.status = prev.status || "draft";
     snap.savedAt = prev.savedAt;
     snap.origin = prev.origin ?? "driver";
-    // Tips and payments record what happened; a revised price must not erase them.
+    // Tips, payments and fuel readings record what happened; a revised price
+    // must not erase them.
     snap.trips.forEach((t, n) => {
       const p = prev.trips?.[n];
       if (p?.tip) t.tip = p.tip;
       if (p?.paid) t.paid = true;
+      if (p?.actual) t.actual = { ...p.actual };
     });
     quotes[i] = snap;
     created = false;

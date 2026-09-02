@@ -329,6 +329,7 @@ export default function Home() {
       {view === "calendar" && <Calendar quotes={st.quotes} settings={st.settings} onPatch={patchQuote} />}
 
       <SettingsPanel settings={st.settings} learnedCount={Object.keys(st.learned).length}
+                     quotes={st.quotes}
                      onChange={(patch) => set({ settings: { ...st.settings, ...patch } })}
                      onClearLearned={() => set({ learned: {} })} />
     </div>

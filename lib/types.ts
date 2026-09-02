@@ -21,6 +21,17 @@ export type Trip = {
 
 export type Counts = Record<string, number>;
 
+/** What a ride actually cost, read off the car after driving it.
+ *
+ *  Every field is optional and independent: fill in only what you measured and
+ *  the rest falls back to the estimate's own assumption. Recorded after the
+ *  fact, so it moves cost and profit and never the agreed price. */
+export type Actual = {
+  km?: number;     // the odometer for this ride
+  l100?: number;   // the trip computer's average, litres per 100 km
+  price?: number;  // $/L from the fill-up that fuelled it
+};
+
 export type Settings = {
   homeName: string; homeLat: number; homeLng: number;
   bizName: string; bizPhone: string; bizWhats: string;
@@ -42,6 +53,8 @@ export type SavedTrip = {
   paxKm: number; paxMins: number;
   tip: number; paid: boolean;
   override: number | null;
+  /** Measured after driving it. Absent means the estimate above still stands. */
+  actual?: Actual;
 };
 
 export type Quote = {

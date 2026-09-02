@@ -1,9 +1,9 @@
 "use client";
 
-import type { Settings } from "@/lib/types";
+import { fmt, measuredAverage, toL100, toKmPerL } from "@/lib/quote";
+import type { Quote, Settings } from "@/lib/types";
 
 const NUM: [keyof Settings, string, string][] = [
-  ["kmPerL", "Km per litre", "Dodge Journey 3.6 ≈ 5"],
   ["fuelPrice", "Fuel price / L", ""],
   ["roadFactor", "Road factor", "Straight line → real roads"],
   ["avgSpeed", "Avg speed km/h", ""],
@@ -17,12 +17,15 @@ const BANDS: [keyof Settings, string][] = [
 ];
 
 export function SettingsPanel({
-  settings, learnedCount, onChange, onClearLearned,
+  settings, learnedCount, quotes, onChange, onClearLearned,
 }: {
-  settings: Settings; learnedCount: number;
+  settings: Settings; learnedCount: number; quotes: Quote[];
   onChange: (patch: Partial<Settings>) => void;
   onClearLearned: () => void;
 }) {
+  // What the car has really been doing, from the rides you measured.
+  const real = measuredAverage(quotes);
+  const drift = real ? real.l100 - toL100(settings.kmPerL) : 0;
   const text = (k: keyof Settings, label: string, hint?: string, extra?: object) => (
     <div className="field" {...extra}>
       <label className="label" htmlFor={`s-${k}`}>{label}</label>
@@ -68,9 +71,41 @@ export function SettingsPanel({
         </p>
 
         <div className="subhead label">Car &amp; fuel</div>
-        <div className="fields">{NUM.map(([k, l, h]) => num(k, l, h))}
+        <div className="fields">
+          <div className="field">
+            <label className="label" htmlFor="s-l100">Consumption</label>
+            <input id="s-l100" type="number" step="0.1" inputMode="decimal"
+                   value={settings.kmPerL > 0 ? String(Math.round(toL100(settings.kmPerL) * 10) / 10) : ""}
+                   onChange={(e) => {
+                     const v = parseFloat(e.target.value);
+                     if (Number.isFinite(v) && v > 0) onChange({ kmPerL: toKmPerL(v) });
+                   }} />
+            <span className="hint">
+              {`L/100 km, as the dash shows it — ${fmt(settings.kmPerL, 1)} km/L. Journey 3.6 ≈ 20`}
+            </span>
+          </div>
+          {NUM.map(([k, l, h]) => num(k, l, h))}
           {text("countryCode", "Default country code", "1 = Canada")}
         </div>
+        {real && (
+          <p className="note">
+            {`Across the ${real.n} ride${real.n > 1 ? "s" : ""} you measured — ${fmt(real.km, 0)} km — the car actually did `}
+            <b>{`${fmt(real.l100, 1)} L/100 km`}</b>
+            {` (${fmt(real.kmPerL, 1)} km/L). `}
+            {Math.abs(drift) < 0.5
+              ? "That matches what you have set."
+              : `That is ${fmt(Math.abs(drift), 1)} L/100 km ${drift > 0 ? "thirstier" : "leaner"} than your setting, so untouched trips are costed ${drift > 0 ? "too cheaply" : "too dearly"}.`}
+            {Math.abs(drift) >= 0.5 && (
+              <>
+                {" "}
+                <button className="btn" type="button" style={{ marginLeft: 6 }}
+                        onClick={() => onChange({ kmPerL: real.kmPerL })}>
+                  {`Use ${fmt(real.l100, 1)} instead`}
+                </button>
+              </>
+            )}
+          </p>
+        )}
 
         <div className="subhead label">Price bands</div>
         <div className="fields">{BANDS.map(([k, l]) => num(k, l))}</div>

@@ -394,6 +394,50 @@ a.link:hover{text-decoration:underline}
   font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-size:.88rem;font-weight:600;flex:none;
 }
+/* What the ride really cost: sits under its leg, reads as a footnote to it. */
+.qlegwrap{display:grid;gap:0}
+.qleg{border-radius:8px 8px 0 0}
+.qlegwrap:has(.qfuel) .qleg{border-bottom:1px solid var(--line)}
+.qfuel{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:6px 10px 7px;background:var(--surface-2);border-radius:0 0 8px 8px;
+}
+.qfuel .lab{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.66rem;font-weight:600;color:var(--muted);flex:none;min-width:3.4rem;
+}
+.fuel-box{
+  display:inline-flex;align-items:baseline;gap:3px;flex:none;
+  border:1px solid var(--line-2);border-radius:7px;padding:2px 6px;background:var(--surface);
+}
+.fuel-box input{
+  width:3.4rem;border:0;background:transparent;color:var(--ink);font:inherit;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:.82rem;padding:0;text-align:right;
+}
+.fuel-box input:focus{outline:none}
+/* An untouched box shows the figure being assumed on your behalf. */
+.fuel-box input::placeholder{color:var(--muted);opacity:.55}
+.fuel-box .u{
+  font-family:"Barlow Condensed",sans-serif;font-size:.66rem;font-weight:600;
+  letter-spacing:.05em;color:var(--muted);
+}
+.fuel-box.has{
+  border-color:color-mix(in srgb,var(--accent) 45%,transparent);
+  background:color-mix(in srgb,var(--accent) 8%,transparent);
+}
+.fuel-box.has input,.fuel-box.has .u{color:var(--accent)}
+.fuel-out{
+  display:inline-flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-left:auto;
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;font-size:.8rem;
+}
+.fuel-out b{font-weight:600;color:var(--ink)}
+.qfuel.measured .fuel-out b{color:var(--accent)}
+.fuel-out .vs{font-family:inherit;font-size:.76rem;color:var(--muted)}
+@media (max-width:560px){
+  .fuel-out{margin-left:0;width:100%}
+  .fuel-box input{width:2.9rem}
+}
 .qacts{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .qacts .spacer{flex:1}
 .qbtn{

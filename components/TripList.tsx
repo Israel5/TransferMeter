@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { fmt, shortName, shortDay } from "@/lib/quote";
+import { fmt, money, fuelUsed, legCost, toL100, shortName, shortDay } from "@/lib/quote";
 import { owedOn, tipTotal } from "@/lib/state";
 import { waLink, waHandle, waPretty } from "@/lib/whatsapp";
-import type { Quote, Settings } from "@/lib/types";
+import type { Actual, Quote, Settings } from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft", requested: "Requested", sent: "Sent",
@@ -17,6 +17,62 @@ const NEXT_STATUS: Record<string, string> = {
  *  draft rather than rendering an empty pill nobody can interpret. */
 const known = (s: string | undefined) =>
   s && STATUS_LABEL[s] ? s : s === "pending" ? "sent" : "draft";
+
+/** What you read off the car after the ride: the odometer, the trip computer's
+ *  average, and what you last paid for a litre. Leave any of them blank and the
+ *  estimate's own assumption stands, shown greyed in the box so you can always
+ *  see what is being assumed on your behalf.
+ *
+ *  This never touches the fare. The price was agreed before the wheels moved;
+ *  measuring the fuel afterwards changes only what the trip cost you. */
+function FuelRow({
+  actual, estKm, estCost, settings, onChange,
+}: {
+  actual: Actual | undefined; estKm: number; estCost: number;
+  settings: Settings; onChange: (a: Actual) => void;
+}) {
+  const real = fuelUsed(actual, estKm, settings);
+  const set = (k: keyof Actual) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.trim();
+    const v = parseFloat(raw);
+    const next: Actual = { ...(actual ?? {}) };
+    if (raw === "" || !Number.isFinite(v) || v <= 0) delete next[k]; else next[k] = v;
+    onChange(next);
+  };
+  const box = (k: keyof Actual, hint: number, unit: string, decimals: number, title: string) => (
+    <span className={"fuel-box" + (actual?.[k] != null ? " has" : "")}>
+      <input type="number" min="0" step="0.1" inputMode="decimal"
+             placeholder={hint > 0 ? fmt(hint, decimals) : ""}
+             aria-label={title} title={title}
+             value={actual?.[k] != null ? String(actual[k]) : ""}
+             onChange={set(k)} />
+      <span className="u">{unit}</span>
+    </span>
+  );
+
+  return (
+    <div className={"qfuel" + (real ? " measured" : "")}>
+      <span className="lab">actual</span>
+      {box("km", estKm, "km", 1, "Kilometres actually driven")}
+      {box("l100", toL100(settings.kmPerL), "L/100km", 1, "The average your dash showed")}
+      {box("price", settings.fuelPrice, "$/L", 2, "What you paid per litre")}
+      <span className="fuel-out">
+        {real ? (
+          <>
+            <b>{fmt(real.litres, 2)} L · {money(real.cost)}</b>
+            <span className="vs">
+              {Math.abs(real.cost - estCost) < 0.005
+                ? "same as estimated"
+                : `estimated ${money(estCost)}`}
+            </span>
+          </>
+        ) : (
+          <span className="vs">estimated {money(estCost)} — fill any box to correct it</span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 /** The name leads; everything else supports it. Detail only when asked for. */
 export function TripList({
@@ -119,7 +175,8 @@ export function TripList({
                     const ns = (t.stops ?? [])
                       .filter((s) => !s.base && String(s.name || "").trim()).map((s) => shortName(s.name));
                     return (
-                      <div key={n} className="qleg">
+                    <div key={n} className="qlegwrap">
+                      <div className="qleg">
                         <span className="lab">{legs.length > 1 ? (t.label === "Return" ? "Return" : "Out") : "Trip"}</span>
                         <span className="when">{(t.date ? shortDay(t.date) : "no date") + (t.time ? ` ${t.time}` : "")}</span>
                         <span className="path">
@@ -148,6 +205,19 @@ export function TripList({
                                  }} />
                         </span>
                       </div>
+                      <FuelRow
+                        actual={t.actual}
+                        estKm={t.totalKm ?? 0}
+                        estCost={t.cost ?? 0}
+                        settings={settings}
+                        onChange={(actual) => {
+                          const trips = legs.map((x, i) =>
+                            i === n
+                              ? { ...x, actual: Object.keys(actual).length ? actual : undefined }
+                              : x);
+                          onPatch(q.id, { trips });
+                        }} />
+                    </div>
                     );
                   })}
 

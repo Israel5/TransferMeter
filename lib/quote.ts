@@ -1,5 +1,5 @@
 import { PLACE_BY_NAME } from "./places";
-import type { Counts, Settings, Stop, Trip, Lang } from "./types";
+import type { Actual, Counts, Quote, SavedTrip, Settings, Stop, Trip, Lang } from "./types";
 
 /* ---------- geography ---------- */
 
@@ -172,6 +172,61 @@ export function scheduleFor(trip: Trip, s: Settings, learned: Record<string, num
     dest: li > pi ? shortName(trip.stops[li].name) : null,
   };
 }
+
+/* ---------- what it really cost ---------- */
+
+/** The dash reads litres per 100 km, the settings read km per litre. Same
+ *  claim, inverted: 5 km/L is 20 L/100 km. Shown both ways so neither the car
+ *  nor the settings page has to be converted in your head. */
+export const toL100 = (kmPerL: number) => (kmPerL > 0 ? 100 / kmPerL : 0);
+export const toKmPerL = (l100: number) => (l100 > 0 ? 100 / l100 : 0);
+
+const has = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0;
+
+export type FuelUsed = {
+  km: number; l100: number; price: number; litres: number; cost: number;
+  measured: { km: boolean; l100: boolean; price: boolean };
+};
+
+/** The fuel a ride actually burned, falling back field by field to what was
+ *  assumed for the quote. Returns null when nothing at all was measured, so a
+ *  caller can tell a reading from an estimate instead of inferring it from the
+ *  numbers — an actual cost that lands on the estimate is still a measurement. */
+export function fuelUsed(a: Actual | undefined, estKm: number, s: Settings): FuelUsed | null {
+  if (!a || (!has(a.km) && !has(a.l100) && !has(a.price))) return null;
+  const km = has(a.km) ? a.km : estKm;
+  const l100 = has(a.l100) ? a.l100 : toL100(s.kmPerL);
+  const price = has(a.price) ? a.price : s.fuelPrice;
+  const litres = (km * l100) / 100;
+  return {
+    km, l100, price, litres, cost: litres * price,
+    measured: { km: has(a.km), l100: has(a.l100), price: has(a.price) },
+  };
+}
+
+/** What a saved leg cost: the estimate, the measurement if there is one, and
+ *  the figure to actually report. */
+export function legCost(t: SavedTrip, s: Settings) {
+  const est = Number(t.cost) || 0;
+  const real = fuelUsed(t.actual, Number(t.totalKm) || 0, s);
+  return { est, cost: real ? real.cost : est, real };
+}
+
+/** Your real consumption across every ride where you read the dash, weighted
+ *  by distance so a long trip counts for more than a short one. This is the
+ *  number the settings default is guessing at. */
+export function measuredAverage(quotes: Quote[]) {
+  let km = 0, litres = 0, n = 0;
+  (quotes ?? []).forEach((q) => (q.trips ?? []).forEach((t) => {
+    const l100 = Number(t.actual?.l100);
+    if (!has(l100)) return;
+    const d = has(Number(t.actual?.km)) ? Number(t.actual?.km) : Number(t.totalKm) || 0;
+    if (d <= 0) return;
+    km += d; litres += (d * l100) / 100; n++;
+  }));
+  return km > 0 && litres > 0 ? { n, km, litres, l100: (litres / km) * 100, kmPerL: km / litres } : null;
+}
+
 
 /* ---------- formatting ---------- */
 
