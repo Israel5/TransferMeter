@@ -221,7 +221,10 @@ export default function Home() {
       <div className="wrap">
         <div className="signin">
           <h2>Transfer Meter</h2>
-          <p>Sign in to see your trips. We&apos;ll email you a link — there&apos;s no password to remember.</p>
+          <p>
+            Enter your email and we&apos;ll send you a link — no password to remember.
+            The first account created becomes the owner; after that, sign-up closes.
+          </p>
           <input type="email" inputMode="email" autoComplete="email" placeholder="you@example.com"
                  value={email} onChange={(e) => setEmail(e.target.value)} />
           <button className="btn primary" type="button" onClick={async () => {
