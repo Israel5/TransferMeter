@@ -47,6 +47,20 @@ Once `.env` has those values:
 psql "$SUPABASE_DB_URL" -f supabase/schema.sql
 ```
 
+
+## Moving the old quotes across
+
+The previous version kept everything in `data.db`. Once your account exists:
+
+```sh
+node scripts/migrate-sqlite.mjs            # shows what would move
+node scripts/migrate-sqlite.mjs --write    # moves it
+```
+
+It reads the SQLite file directly and upserts by quote id, so running it twice
+changes nothing. Tips, payment flags, notes, statuses and corrected distances
+all come across intact.
+
 ## Local development
 
 ```sh
