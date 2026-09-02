@@ -66,8 +66,17 @@ export default function Home() {
       if (sb && owner) {
         setStore("Saving…");
         try {
-          await push(sb, owner, next, (q) =>
+          const adopted = await push(sb, owner, next, (q) =>
             customerPayload(q, next.settings, (v: string) => waDigits(v, next.settings)));
+          // A customer corrected their counts while this was open; the save
+          // kept their version, so the screen should show it too.
+          if (adopted) {
+            setSt((prev) => ({
+              ...prev,
+              quotes: prev.quotes.map((q) => adopted.find((a) => a.id === q.id) ?? q),
+            }));
+            say("A customer updated their passenger or luggage details.");
+          }
           setStore("Synced");
         }
         catch (e) { setStore("Not saved"); }

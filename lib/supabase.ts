@@ -100,17 +100,50 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
   };
 }
 
+/** Counts a customer corrected while this app had the quote open.
+ *
+ *  A save here writes the whole record, so without this the driver's older
+ *  copy would quietly overwrite what the customer had just fixed. Only the
+ *  counts can collide -- nothing else on the page is theirs to change -- and
+ *  on those the customer is the authority: they are the ones who know how many
+ *  suitcases they are carrying. So their numbers win, everything else is the
+ *  driver's, and neither side sees an error. */
+async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Quote[]> {
+  const ids = quotes.map((q) => q.id).filter(Boolean);
+  if (!ids.length) return quotes;
+
+  const { data, error } = await sb.from("quotes").select("id,data").in("id", ids);
+  if (error || !data) return quotes;          // never block a save on this
+
+  const remote = new Map<string, Quote>();
+  data.forEach((r: { id: string; data: Quote }) => { if (r?.data) remote.set(r.id, r.data); });
+
+  return quotes.map((q) => {
+    const r = remote.get(q.id);
+    const theirs = r?.customerEditedAt;
+    if (!theirs) return q;
+    // Only defer to an edit this copy has not already seen.
+    if (q.customerEditedAt && q.customerEditedAt >= theirs) return q;
+    return { ...q, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
+             customerEditedAt: theirs };
+  });
+}
+
 export async function push(
   sb: SupabaseClient,
   owner: string,
   st: AppState,
   viewOf?: (q: Quote) => unknown,
 ) {
+  let adopted: Quote[] | null = null;
   if (st.quotes.length) {
+    const merged = await withCustomerEdits(sb, st.quotes);
     const { error } = await sb
       .from("quotes")
-      .upsert(st.quotes.map((q) => rowFrom(q, owner, viewOf?.(q))), { onConflict: "id" });
+      .upsert(merged.map((q) => rowFrom(q, owner, viewOf?.(q))), { onConflict: "id" });
     if (error) throw new Error(error.message);
+    // Only worth handing back when a customer's correction was actually taken.
+    if (merged.some((q, i) => q !== st.quotes[i])) adopted = merged;
   }
   const { error: e2 } = await sb.from("settings").upsert(
     {
@@ -132,6 +165,8 @@ export async function push(
       .upsert(pairs.map(([pair, km]) => ({ owner, pair, km })), { onConflict: "owner,pair" });
     if (e3) throw new Error(e3.message);
   }
+
+  return adopted;
 }
 
 /** Deleting is deliberate; absence from a save never removes anything. */

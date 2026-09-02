@@ -9,7 +9,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
    they read. The driver's own address is never in it — their stops arrive
    already named by the part they play in the journey. */
 
-type Leg = { k: string; d: string; h: string; s: string[]; m: number[]; km: number; mn: number; pr: number };
+type Leg = {
+  k: string; d: string; h: string; s: string[]; m: number[];
+  km: number; mn: number; pr: number;
+  /** The part with the passenger aboard. Absent on links sent before this. */
+  pkm?: number; pmn?: number;
+};
 type Counts = Record<string, number>;
 type Payload = {
   b?: string; p?: string; w?: string; n?: string; c?: string;
@@ -62,6 +67,7 @@ const T = {
         thanksYes: "Obrigado! O seu transfer está confirmado.",
         thanksNo: "Tudo bem — o motorista foi avisado.",
         sending: "A enviar…", stops: "Percurso",
+        yourRide: "A sua viagem", totalDriven: "Percurso total do motorista",
         failed: "Não foi possível registar a sua resposta. Tente novamente.",
         lockedNote: "Já respondeu a este orçamento, por isso os dados estão fechados.",
         callDriver: "Precisa de mudar algo? Fale com o motorista." },
@@ -78,6 +84,7 @@ const T = {
         thanksYes: "Thank you — your transfer is confirmed.",
         thanksNo: "No problem — your driver has been told.",
         sending: "Sending…", stops: "Route",
+        yourRide: "Your journey", totalDriven: "Total driven by the driver",
         failed: "That didn't go through. Please try again.",
         lockedNote: "You have already answered this quote, so the details are closed.",
         callDriver: "Need to change something? Talk to your driver." },
@@ -94,6 +101,7 @@ const T = {
         thanksYes: "Merci — votre transfert est confirmé.",
         thanksNo: "Très bien — votre chauffeur est prévenu.",
         sending: "Envoi…", stops: "Trajet",
+        yourRide: "Votre trajet", totalDriven: "Trajet total du chauffeur",
         failed: "L'envoi a échoué. Réessayez.",
         lockedNote: "Vous avez déjà répondu à ce devis, les informations sont donc fermées.",
         callDriver: "Besoin d'un changement ? Parlez à votre chauffeur." },
@@ -271,8 +279,20 @@ export default function CustomerQuote() {
               </ol>
 
               <div className="cq-leg-foot">
-                <span>{km(leg.km)}</span>
-                <span>{dur(leg.mn)}</span>
+                {Number.isFinite(leg.pkm) && (leg.pkm ?? 0) > 0 ? (
+                  <>
+                    <span className="mine">
+                      <b>{L.yourRide}</b>
+                      {`${km(leg.pkm ?? 0)}  ·  ${dur(leg.pmn ?? 0)}`}
+                    </span>
+                    <span className="theirs">
+                      <b>{L.totalDriven}</b>
+                      {`${km(leg.km)}  ·  ${dur(leg.mn)}`}
+                    </span>
+                  </>
+                ) : (
+                  <span className="mine"><b>{L.yourRide}</b>{`${km(leg.km)}  ·  ${dur(leg.mn)}`}</span>
+                )}
               </div>
             </div>
           ))}
@@ -360,7 +380,7 @@ export default function CustomerQuote() {
                       onClick={() => answer("approved")}>
                 {busy ? L.sending : L.yes}
               </button>
-              <button className="cq-no" type="button" disabled={busy || editing}
+              <button className="cq-decline" type="button" disabled={busy || editing}
                       onClick={() => answer("declined")}>
                 {L.no}
               </button>

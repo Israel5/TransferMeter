@@ -27,6 +27,10 @@
   --meter-digit:#e8a33d;
   --meter-good:#4cbf92;
   --meter-bad:#f0836f;
+  /* the customer sheet's banding: dark in both themes, like the meter */
+  --slate:#16202e;
+  --paper-muted:#8496ad;
+  --amber:#e8a33d;
   --shadow:0 1px 2px rgba(19,26,36,.06),0 8px 24px -12px rgba(19,26,36,.18);
 }
 @media (prefers-color-scheme:dark){
@@ -871,10 +875,17 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
   font-size:.74rem;color:var(--muted);
 }
 .cq-leg-foot{
-  display:flex;gap:16px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
+  display:grid;gap:5px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line);
   font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
   font-size:.78rem;color:var(--muted);
 }
+.cq-leg-foot span{display:flex;align-items:baseline;gap:8px}
+.cq-leg-foot b{
+  flex:1;min-width:0;font-family:"Barlow Condensed",sans-serif;font-weight:600;
+  text-transform:uppercase;letter-spacing:.07em;font-size:.66rem;
+}
+.cq-leg-foot .mine{color:var(--ink)}
+.cq-leg-foot .mine b{color:var(--muted)}
 
 /* What they are bringing */
 .cq-details{margin:0;display:grid;gap:10px}
@@ -963,8 +974,8 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .cq-choice button:disabled{opacity:.5;cursor:default}
 .cq-yes{background:var(--good);border-color:var(--good);color:#fff}
 .cq-yes:hover:not(:disabled){filter:brightness(1.07)}
-.cq-no{background:transparent;color:var(--muted)}
-.cq-no:hover:not(:disabled){border-color:var(--bad);color:var(--bad)}
+.cq-decline{background:transparent;color:var(--muted)}
+.cq-decline:hover:not(:disabled){border-color:var(--bad);color:var(--bad)}
 
 .cq-verdict{
   display:flex;align-items:center;gap:13px;text-align:left;

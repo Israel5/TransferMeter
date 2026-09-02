@@ -59,6 +59,9 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
         s: v.stops,
         m: v.legKm,
         km: Math.round(v.km * 10) / 10, mn: Math.round(t.mins ?? 0), pr: t.price ?? 0,
+        // What they are actually in the car for. Without this the sheet shows
+        // the whole loop and a customer reads their own journey as two hours.
+        pkm: Math.round((t.paxKm ?? 0) * 10) / 10, pmn: Math.round(t.paxMins ?? 0),
       };
     }),
     x: {
