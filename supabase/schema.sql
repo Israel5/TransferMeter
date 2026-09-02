@@ -52,6 +52,7 @@ create table if not exists public.config (
   owner uuid not null references auth.users(id) on delete cascade
 );
 alter table public.config enable row level security;
+drop policy if exists "owner reads config" on public.config;
 create policy "owner reads config" on public.config
   for select using (auth.uid() = owner);
 
@@ -76,18 +77,24 @@ alter table public.settings enable row level security;
 alter table public.learned  enable row level security;
 
 -- You, signed in, own your rows and nothing else.
-create policy "owner reads own quotes"   on public.quotes
+drop policy if exists "owner reads own quotes" on public.quotes;
+create policy "owner reads own quotes" on public.quotes
   for select using (auth.uid() = owner);
-create policy "owner writes own quotes"  on public.quotes
+drop policy if exists "owner writes own quotes" on public.quotes;
+create policy "owner writes own quotes" on public.quotes
   for insert with check (auth.uid() = owner);
+drop policy if exists "owner updates own quotes" on public.quotes;
 create policy "owner updates own quotes" on public.quotes
   for update using (auth.uid() = owner) with check (auth.uid() = owner);
+drop policy if exists "owner deletes own quotes" on public.quotes;
 create policy "owner deletes own quotes" on public.quotes
   for delete using (auth.uid() = owner);
 
+drop policy if exists "owner owns settings" on public.settings;
 create policy "owner owns settings" on public.settings
   for all using (auth.uid() = owner) with check (auth.uid() = owner);
-create policy "owner owns learned"  on public.learned
+drop policy if exists "owner owns learned" on public.learned;
+create policy "owner owns learned" on public.learned
   for all using (auth.uid() = owner) with check (auth.uid() = owner);
 
 -- Anonymous visitors get no table access at all.
