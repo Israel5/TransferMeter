@@ -16,7 +16,7 @@ import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
-import { getClient, pull, push, removeQuote, signIn, signOut, type PublicConfig } from "@/lib/supabase";
+import { getClient, pull, push, removeQuote, rotateShareToken, signIn, signOut, type PublicConfig } from "@/lib/supabase";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
 
 const LOCAL_KEY = "transfer-meter-v3";
@@ -220,6 +220,23 @@ export default function Home() {
     return { link, isPrivate };
   };
 
+  /** Retire the link that was sent and issue a new address for this quote.
+   *  Anyone still holding the old one gets nothing, including the customer,
+   *  so the replacement has to be sent again. */
+  const revokeLink = async (q: Quote) => {
+    if (!sb || !owner || !q.shareToken) {
+      say("Nothing to revoke — this quote has no link yet.");
+      return;
+    }
+    try {
+      const token = await rotateShareToken(sb, q.id);
+      setSt((prev) => ({ ...prev, quotes: prev.quotes.map((x) => (x.id === q.id ? { ...x, shareToken: token } : x)) }));
+      say("Old link disabled. Send or copy the new one.");
+    } catch (e) {
+      say((e as Error).message);
+    }
+  };
+
   /** Hand the link over for pasting anywhere — email, SMS, anything. */
   const copyLink = async (q: Quote) => {
     const { link, isPrivate } = customerLinkFor(q);
@@ -313,7 +330,7 @@ export default function Home() {
         <TripList quotes={st.quotes} settings={st.settings}
                   onOpen={(id) => { const next = loadQuote(st, id); setSt(next); persist(next); setView("quote"); }}
                   onDelete={doDelete} onPdf={savePdf} onSend={sendQuote} onCopyLink={copyLink}
-                  onPatch={patchQuote}
+                  onRevokeLink={revokeLink} onPatch={patchQuote}
                   onNew={() => { const next = newQuote(st); setSt(next); persist(next); setView("quote"); }} />
       )}
 

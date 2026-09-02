@@ -20,7 +20,7 @@ const known = (s: string | undefined) =>
 
 /** The name leads; everything else supports it. Detail only when asked for. */
 export function TripList({
-  quotes, settings, onOpen, onDelete, onPdf, onSend, onCopyLink, onPatch, onNew,
+  quotes, settings, onOpen, onDelete, onPdf, onSend, onCopyLink, onRevokeLink, onPatch, onNew,
 }: {
   quotes: Quote[]; settings: Settings;
   onOpen: (id: string) => void;
@@ -28,10 +28,13 @@ export function TripList({
   onPdf: (q: Quote) => void;
   onSend: (q: Quote) => void;
   onCopyLink: (q: Quote) => void;
+  onRevokeLink: (q: Quote) => void;
   onPatch: (id: string, patch: Partial<Quote>) => void;
   onNew: () => void;
 }) {
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  // Revoking breaks a link already in someone's hands, so it asks first.
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
   const needle = filter.trim().toLowerCase();
@@ -164,6 +167,24 @@ export function TripList({
                     <button className="qbtn" type="button" onClick={() => onSend(q)}>Send</button>
                     <button className="qbtn" type="button" title="Copy the customer's link"
                             onClick={() => onCopyLink(q)}>Copy link</button>
+                    {q.shareToken && (
+                      confirming === q.id ? (
+                        <button className="qbtn danger" type="button"
+                                title="The link already sent will stop working"
+                                onClick={() => { setConfirming(null); onRevokeLink(q); }}>
+                          Break the old link?
+                        </button>
+                      ) : (
+                        <button className="qbtn" type="button"
+                                title="Issue a new link and disable the one already sent"
+                                onClick={() => {
+                                  setConfirming(q.id);
+                                  setTimeout(() => setConfirming((c) => (c === q.id ? null : c)), 4000);
+                                }}>
+                          Revoke link
+                        </button>
+                      )
+                    )}
                     <button className="qbtn" type="button" onClick={() => onOpen(q.id)}>Open</button>
                     <button className="qbtn" type="button" onClick={() => onPdf(q)}>PDF</button>
                     <button className="qbtn danger" type="button" onClick={() => onDelete(q.id)}>Delete</button>

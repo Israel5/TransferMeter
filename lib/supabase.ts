@@ -127,6 +127,15 @@ export async function removeQuote(sb: SupabaseClient, id: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Give a quote a new address, so any link already sent stops working.
+ *  The owner may update their own rows, so this needs no extra privilege. */
+export async function rotateShareToken(sb: SupabaseClient, id: string) {
+  const token = crypto.randomUUID().replace(/-/g, "");
+  const { error } = await sb.from("quotes").update({ share_token: token }).eq("id", id);
+  if (error) throw new Error(error.message);
+  return token;
+}
+
 /** Read one quote as a customer would, using only the public key. */
 export async function fetchQuoteByToken(sb: SupabaseClient, token: string) {
   const { data, error } = await sb.rpc("quote_by_token", { token });

@@ -34,3 +34,6 @@ tsconfig.tsbuildinfo
 /store.js
 /lib/maps.js
 /api/
+
+# build output for the backfill script
+.build/

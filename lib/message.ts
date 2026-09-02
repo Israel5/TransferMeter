@@ -1,4 +1,4 @@
-import { fmt, dur, niceDate, countList, customerView, shortName, tripTotals } from "./quote";
+import { fmt, dur, niceDate, countList, customerView, customerRoute, shortName, tripTotals } from "./quote";
 import { wordsFor } from "./words";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "./types";
 import type { AppState } from "./state";
@@ -80,13 +80,15 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
     w: waDigits(s.bizWhats) || waDigits(s.bizPhone) || "",
     n: q.quoteNo ?? "", c: q.customer ?? "", l: q.lang,
     t: (q.trips ?? []).map((t) => {
-      const v = customerView(t.stops, t.legKm, t.paxKm, t.paxMins);
+      // The full journey, with my own address shown as its role rather than
+      // its street, so the distance behind the price is visible.
+      const v = customerRoute(t.stops, t.legKm, W);
       return {
         k: t.label === "Return" ? "ret" : "out",
         d: t.date || "", h: t.time || "",
-        s: v.stops.map((st) => st.name || "—"),
-        m: v.legKm.map((n) => Math.round(n * 10) / 10),
-        km: Math.round(v.km * 10) / 10, mn: Math.round(v.mins), pr: t.price ?? 0,
+        s: v.stops,
+        m: v.legKm,
+        km: Math.round(v.km * 10) / 10, mn: Math.round(t.mins ?? 0), pr: t.price ?? 0,
       };
     }),
     x: {

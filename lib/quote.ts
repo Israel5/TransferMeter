@@ -145,6 +145,22 @@ export function customerView(stops: Stop[], legKm: (number | null)[], paxKm?: nu
   };
 }
 
+/** The whole route as a customer should read it: every stop and every leg, but
+ *  the driver's own address replaced by what it is rather than where it is.
+ *  They see the full distance behind the price without learning where I live. */
+export function customerRoute(
+  stops: Stop[],
+  legKm: (number | null)[],
+  labels: { startPoint: string; endPoint: string },
+) {
+  const named = stops.map((st, i) => {
+    if (!st.base) return String(st.name || "—");
+    return i === 0 ? labels.startPoint : i === stops.length - 1 ? labels.endPoint : labels.startPoint;
+  });
+  const km = legKm.map((n) => Math.round((Number(n) || 0) * 10) / 10);
+  return { stops: named, legKm: km, km: km.reduce((a, b) => a + b, 0) };
+}
+
 /* ---------- schedule ---------- */
 
 export function scheduleFor(trip: Trip, s: Settings, learned: Record<string, number>) {

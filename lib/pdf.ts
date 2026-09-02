@@ -2,7 +2,7 @@
 // tracked capitals, using only the base-14 fonts every reader has. No library
 // is loaded, so this works identically on a server, in a browser, and inside a
 // sandboxed page that cannot fetch anything.
-import { fmt, dur, niceDate, countList, customerView, shortName } from "./quote";
+import { fmt, dur, niceDate, countList, customerRoute, shortName } from "./quote";
 import { wordsFor } from "./words";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "./types";
 import type { Quote, Settings } from "./types";
@@ -135,8 +135,8 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
   cap(LBL.to, M, y);
   text(q.customer || "—", M, y-17, {size:14,bold:true});
   const legN=(q.trips||[]).length;
-  const paxKm   = (q.trips||[]).reduce((n:number,t:any)=>n+customerView(t.stops,t.legKm,t.paxKm,t.paxMins).km, 0);
-  const paxMins = (q.trips||[]).reduce((n:number,t:any)=>n+customerView(t.stops,t.legKm,t.paxKm,t.paxMins).mins, 0);
+  const paxKm   = (q.trips||[]).reduce((n:number,t:any)=>n+customerRoute(t.stops,t.legKm,W_).km, 0);
+  const paxMins = (q.trips||[]).reduce((n:number,t:any)=>n+(t.mins||0), 0);
   cap(legN>1 ? legN+" "+W_.legs[1] : W_.oneway, W-M, y, {align:"right"});
   text(fmt(paxKm,1)+" km", W-M, y-17, {size:11,color:GREY,align:"right"});
   y -= 40;
@@ -144,7 +144,7 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
 
   /* ---- each leg as a card with a route rail ---- */
   (q.trips||[]).forEach((t:any)=>{
-    const view=customerView(t.stops, t.legKm, t.paxKm, t.paxMins);
+    const view=customerRoute(t.stops, t.legKm, W_);
     const stops=view.stops;
     const cardH = 30 + Math.max(stops.length,1)*17 + 22;
     room(cardH+16);
@@ -165,18 +165,18 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
       text("—", labelX, ry, {size:9.8, color:GREY});
       ry -= 17;
     }
-    stops.forEach((st:any,i:number)=>{
+    stops.forEach((st:string,i:number)=>{
       const isEnd = i===0 || i===stops.length-1;
       const cy=ry+3.2;
       circle(railX, cy, isEnd?3.4:3.0, isEnd?SLATE:PAPER);
       if(!isEnd) ring(railX, cy, 3.0, AMBER, 1.3);
-      text(st.name||"—", labelX, ry, {size:9.8});
+      text(st||"\u2014", labelX, ry, {size:9.8});
       if(i<stops.length-1 && isFinite(view.legKm[i])){
         text(fmt(view.legKm[i],1)+" km", W-M-16, ry-8.5, {size:8,color:GREY,align:"right"});
       }
       ry -= 17;
     });
-    text(fmt(view.km,1)+" km  ·  "+dur(view.mins), labelX, bot+11, {size:8.5,color:GREY});
+    text(fmt(view.km,1)+" km  \u00b7  "+dur(t.mins||0), labelX, bot+11, {size:8.5,color:GREY});
     y = bot - 16;
   });
 
