@@ -1,57 +1,16 @@
-"use client";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { AppState } from "@/lib/state";
+import { dedupeQuotes } from "@/lib/state";
+import type { Quote, Settings } from "@/lib/types";
+import { DEFAULTS } from "@/lib/types";
 
-import { createClient, type SupabaseClient, type Session } from "@supabase/supabase-js";
-import type { AppState } from "./state";
-import { dedupeQuotes } from "./state";
-import type { Quote, Settings } from "./types";
-import { DEFAULTS } from "./types";
-
-let client: SupabaseClient | null = null;
-
-/** Compiled in at build time from Vercel's environment. Both values are public
- *  by design; row-level security is what actually guards the data. */
-export function getClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return null;
-  if (!client) {
-    client = createClient(url, anon, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-    });
-  }
-  return client;
-}
-
-/** Sign in with a password.
+/* Every read and write of the driver's data, run on the server.
  *
- *  Deliberately not a magic link: that would email the driver from Supabase,
- *  with Supabase's branding, to sign in to their own application. Nothing
- *  about the login should reveal, or depend on, who hosts the database. */
-/** A customer correcting their own passenger and luggage counts. The database
- *  decides whether the quote is still open to it; this only carries the ask. */
-export async function updateQuoteCounts(
-  sb: SupabaseClient, token: string,
-  counts: { pax?: Record<string, number>; gear?: Record<string, number>; bags?: Record<string, number> },
-) {
-  const { data, error } = await sb.rpc("update_quote_counts", { token, counts });
-  if (error) throw error;
-  return data as { xc?: Record<string, Record<string, number>> };
-}
-
-export async function signIn(sb: SupabaseClient, email: string, password: string) {
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) {
-    throw new Error(
-      /invalid login/i.test(error.message)
-        ? "That email and password don't match."
-        : error.message,
-    );
-  }
-}
-
-export async function signOut(sb: SupabaseClient) {
-  await sb.auth.signOut();
-}
+ * These used to run in the browser against the database directly. They still
+ * use the signed-in user's own token, so row-level security is unchanged and
+ * this code cannot reach another owner's rows -- it simply runs where no
+ * script on the page can see it, and where no key has to ship to reach it.
+ */
 
 function rowFrom(q: Quote, owner: string, customerView?: unknown) {
   const dated = (q.trips ?? []).map((t) => t.date).filter(Boolean).sort();
@@ -230,5 +189,3 @@ export async function answerQuote(sb: SupabaseClient, token: string, answer: "ap
   if (error) throw new Error(error.message);
   return data as { status: string; answered_at: string };
 }
-
-export type { Session };

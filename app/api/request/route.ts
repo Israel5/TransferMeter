@@ -4,16 +4,16 @@ import { NextResponse } from "next/server";
  *
  * Two gates, and both are here on the server because neither can be trusted to
  * a browser. Turnstile says a person filled the form in; the shared secret says
- * the request came through this route rather than straight at the API with the
- * public key that ships inside every page. The database then decides what may
+ * the request came through this route rather than straight at the database's
+ * API, which is reachable from anywhere. The database then decides what may
  * actually be stored -- see request_quote, which keeps named fields only.
  */
 
 const TURNSTILE_VERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export async function POST(req: Request) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.SUPABASE_URL;
+  const anon = process.env.SUPABASE_ANON_KEY;
   const formSecret = process.env.QUOTE_REQUEST_SECRET;
   const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
 

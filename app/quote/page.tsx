@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { getClient, fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/supabase";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/api";
 
 /* What a customer sees. The link carries only a token; everything on the page
    comes from the row it unlocks, so a price changed after sending is the price
@@ -134,7 +133,6 @@ function phrase(store: Counts, items: string[], dict: Record<string, [string, st
 export default function CustomerQuote() {
   const [q, setQ] = useState<Payload | null>(null);
   const [ready, setReady] = useState(false);
-  const [sb, setSb] = useState<SupabaseClient | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -151,15 +149,11 @@ export default function CustomerQuote() {
       const t = window.location.hash.replace(/^#/, "").match(/(?:^|&)t=([^&]+)/)?.[1] ?? null;
       if (t) {
         try {
-          const client = getClient();
-          if (client) {
-            setSb(client);
-            setToken(t);
-            const row = await fetchQuoteByToken(client, t);
-            if (row) {
-              setQ(row as Payload);
-              setStatus((row as { status?: string }).status ?? null);
-            }
+          setToken(t);
+          const row = await fetchQuoteByToken(t);
+          if (row) {
+            setQ(row as Payload);
+            setStatus((row as { status?: string }).status ?? null);
           }
         } catch { /* falls through to the empty state */ }
       }
@@ -183,10 +177,10 @@ export default function CustomerQuote() {
   const overSeats = editing && heads > seats;
 
   const answer = async (choice: "approved" | "declined") => {
-    if (!sb || !token || busy) return;
+    if (!token || busy) return;
     setBusy(true); setFailed(false);
     try {
-      const r = await answerQuote(sb, token, choice);
+      const r = await answerQuote(token, choice);
       setStatus(r.status);
     } catch { setFailed(true); }
     finally { setBusy(false); }
@@ -207,10 +201,10 @@ export default function CustomerQuote() {
   };
 
   const save = async () => {
-    if (!sb || !token || saving) return;
+    if (!token || saving) return;
     setSaving(true); setSaveFail(false);
     try {
-      await updateQuoteCounts(sb, token, draft);
+      await updateQuoteCounts(token, draft);
       setQ((prev) => (prev ? { ...prev, xc: { ...prev.xc, ...draft } } : prev));
       setEditing(false); setSavedNote(true);
     } catch { setSaveFail(true); }

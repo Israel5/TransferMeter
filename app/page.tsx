@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Editor } from "@/components/Editor";
 import { TripList } from "@/components/TripList";
 import { Calendar } from "@/components/Calendar";
@@ -10,20 +9,19 @@ import {
   initialState, loadQuote, newQuote, saveQuote, dedupeQuotes,
   type AppState,
 } from "@/lib/state";
-import { draftMessage, customerPayload } from "@/lib/message";
+import { draftMessage } from "@/lib/message";
 import { buildPDF } from "@/lib/pdf";
 import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
-import { getClient, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/supabase";
+import { currentSession, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
   const [st, setSt] = useState<AppState>(initialState);
   const [view, setView] = useState<"list" | "quote" | "calendar">("list");
-  const [sb, setSb] = useState<SupabaseClient | null>(null);
-  const [owner, setOwner] = useState<string | null>(null);
+  const [signedIn, setSignedIn] = useState(false);
   const [booted, setBooted] = useState(false);
   const live = true;   // the Maps proxy is always there
   const [store, setStore] = useState("This browser");
@@ -40,21 +38,15 @@ export default function Home() {
   /* ---------- boot: session, then data ---------- */
   useEffect(() => {
     (async () => {
-      const client = getClient();
-      setSb(client);
-      if (!client) { setBooted(true); return; }
-
-      const { data } = await client.auth.getSession();
-      const uid = data.session?.user?.id ?? null;
-      setOwner(uid);
-      if (uid) {
+      const here = await currentSession();
+      setSignedIn(here);
+      if (here) {
         try {
-          const remote = await pull(client);
+          const remote = await pull();
           if (remote) setSt((prev) => ({ ...prev, ...remote } as AppState));
           setStore("Synced");
         } catch { setStore("Not saved"); }
       }
-      client.auth.onAuthStateChange((_e, s) => setOwner(s?.user?.id ?? null));
       setBooted(true);
     })();
   }, []);
@@ -64,23 +56,21 @@ export default function Home() {
    *  quote actually exists in the database. */
   const persistNow = useCallback(async (next: AppState) => {
     if (pushTimer.current) clearTimeout(pushTimer.current);
-    if (!sb || !owner) return;
+    if (!signedIn) return;
     setStore("Saving…");
     try {
-      await push(sb, owner, next, (q) =>
-        customerPayload(q, next.settings, (v: string) => waDigits(v, next.settings)));
+      await push(next);
       setStore("Synced");
     } catch { setStore("Not saved"); throw new Error("Could not save that quote."); }
-  }, [sb, owner]);
+  }, [signedIn]);
 
   const persist = useCallback((next: AppState) => {
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(async () => {
-      if (sb && owner) {
+      if (signedIn) {
         setStore("Saving…");
         try {
-          const adopted = await push(sb, owner, next, (q) =>
-            customerPayload(q, next.settings, (v: string) => waDigits(v, next.settings)));
+          const adopted = await push(next);
           // A customer corrected their counts while this was open; the save
           // kept their version, so the screen should show it too.
           if (adopted) {
@@ -95,7 +85,7 @@ export default function Home() {
         catch (e) { setStore("Not saved"); }
       }
     }, 600);
-  }, [sb, owner]);
+  }, [signedIn]);
 
   const set = useCallback((patch: Partial<AppState>) => {
     setSt((prev) => { const next = { ...prev, ...patch }; persist(next); return next; });
@@ -192,15 +182,15 @@ export default function Home() {
     // A status change is its own write: saves no longer carry one, so that
     // nothing can undo an answer by accident and nothing can stop you undoing
     // one on purpose.
-    if (patch.status && sb && owner) {
-      setQuoteStatus(sb, id, patch.status).catch(() => setStore("Not saved"));
+    if (patch.status && signedIn) {
+      setQuoteStatus(id, patch.status).catch(() => setStore("Not saved"));
     }
   };
 
   const doDelete = async (id: string) => {
     setSt((prev) => { const next = { ...prev, quotes: prev.quotes.filter((q) => q.id !== id) }; persist(next); return next; });
-    if (sb && owner) {
-      try { await removeQuote(sb, id); }
+    if (signedIn) {
+      try { await removeQuote(id); }
       catch { setStore("Not saved"); say("That quote could not be deleted — it will come back when you reload."); }
     }
   };
@@ -239,9 +229,10 @@ export default function Home() {
    *  that was never stored is a link to nothing. */
   const linkable = async (q: Quote): Promise<Quote | null> => {
     if (q.shareToken) return q;
-    if (!sb || !owner) { say("Sign in first — a customer link lives in the database."); return null; }
+
+  if (!signedIn) { say("Sign in first — a customer link lives in the database."); return null; }
     try {
-      const token = await fetchShareToken(sb, q.id);
+      const token = await fetchShareToken(q.id);
       if (!token) { say("That quote has not finished saving yet. Try again in a moment."); return null; }
       setSt((prev) => ({ ...prev,
         quotes: prev.quotes.map((x) => (x.id === q.id ? { ...x, shareToken: token } : x)) }));
@@ -253,12 +244,12 @@ export default function Home() {
    *  Anyone still holding the old one gets nothing, including the customer,
    *  so the replacement has to be sent again. */
   const revokeLink = async (q: Quote) => {
-    if (!sb || !owner || !q.shareToken) {
+    if (!signedIn || !q.shareToken) {
       say("Nothing to revoke — this quote has no link yet.");
       return;
     }
     try {
-      const token = await rotateShareToken(sb, q.id);
+      const token = await rotateShareToken(q.id);
       setSt((prev) => ({ ...prev, quotes: prev.quotes.map((x) => (x.id === q.id ? { ...x, shareToken: token } : x)) }));
       say("Old link disabled. Send or copy the new one.");
     } catch (e) {
@@ -327,7 +318,8 @@ export default function Home() {
   /* ---------- render ---------- */
   if (!booted) return <div className="wrap" />;
 
-  if (sb && !owner) {
+
+  if (!signedIn) {
     const go = async () => {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
         setSignInMsg({ text: "That doesn't look like an email address." }); return;
@@ -335,7 +327,7 @@ export default function Home() {
       if (!password) { setSignInMsg({ text: "Enter your password." }); return; }
       setSignInMsg({ text: "Signing in…" });
       try {
-        await signIn(sb, email.trim(), password);
+        await signIn(email.trim(), password);
         setPassword("");
         location.reload();
       } catch (e) { setSignInMsg({ text: (e as Error).message }); }
@@ -400,8 +392,8 @@ export default function Home() {
                      onChange={(patch) => set({ settings: { ...st.settings, ...patch } })}
                      onClearLearned={() => {
                        set({ learned: {} });
-                       if (sb && owner) {
-                         clearLearned(sb, owner)
+                       if (signedIn) {
+                         clearLearned()
                            .catch(() => say("Those distances could not be forgotten — they will return on reload."));
                        }
                      }} />
