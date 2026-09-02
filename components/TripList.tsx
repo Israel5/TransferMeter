@@ -13,6 +13,10 @@ const STATUS_LABEL: Record<string, string> = {
 const NEXT_STATUS: Record<string, string> = {
   draft: "sent", requested: "sent", sent: "approved", approved: "declined", declined: "draft",
 };
+/** Anything unrecognised — an older record, a hand-edited row — reads as a
+ *  draft rather than rendering an empty pill nobody can interpret. */
+const known = (s: string | undefined) =>
+  s && STATUS_LABEL[s] ? s : s === "pending" ? "sent" : "draft";
 
 /** The name leads; everything else supports it. Detail only when asked for. */
 export function TripList({
@@ -63,7 +67,7 @@ export function TripList({
 
         <ul className="saved-list">
           {shown.map((q) => {
-            const st = q.status ?? "draft";
+            const st = known(q.status);
             const legs = q.trips ?? [];
             const tips = tipTotal(q);
             const owed = owedOn(q);
