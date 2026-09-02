@@ -52,8 +52,10 @@ function FuelRow({
 
   return (
     <div className={"qfuel" + (real ? " measured" : "")}>
-      <span className="lab">actual</span>
-      {box("km", estKm, "km", 1, "Kilometres actually driven")}
+      <span className="lab" title="Measured from your door to your door, the whole loop including the empty legs">
+        actual
+      </span>
+      {box("km", estKm, "km", 1, "Kilometres actually driven, your door back to your door")}
       {box("l100", toL100(settings.kmPerL), "L/100km", 1, "The average your dash showed")}
       {box("price", settings.fuelPrice, "$/L", 2, "What you paid per litre")}
       <span className="fuel-out">
@@ -63,11 +65,13 @@ function FuelRow({
             <span className="vs">
               {Math.abs(real.cost - estCost) < 0.005
                 ? "same as estimated"
-                : `estimated ${money(estCost)}`}
+                : `estimated ${money(estCost)} for ${fmt(estKm, 1)} km`}
             </span>
           </>
         ) : (
-          <span className="vs">estimated {money(estCost)} — fill any box to correct it</span>
+          <span className="vs">
+            {`estimated ${money(estCost)} for ${fmt(estKm, 1)} km door to door`}
+          </span>
         )}
       </span>
     </div>
@@ -181,7 +185,10 @@ export function TripList({
                         <span className="when">{(t.date ? shortDay(t.date) : "no date") + (t.time ? ` ${t.time}` : "")}</span>
                         <span className="path">
                           {(ns[0] ?? "—") + " → " + (ns[ns.length - 1] ?? "—") + "  ·  "
-                            + fmt(t.paxKm ?? t.totalKm, 0) + " km"}
+                            + fmt(t.paxKm ?? t.totalKm, 0) + " km with passenger"
+                            + ((t.totalKm ?? 0) > (t.paxKm ?? 0)
+                                ? `, ${fmt(t.totalKm ?? 0, 0)} km driven`
+                                : "")}
                         </span>
                         <span className="fare">${fmt(t.price, 0)}</span>
                         <button type="button" className={"paidbtn" + (t.paid ? " yes" : "")}
