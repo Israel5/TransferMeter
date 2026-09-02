@@ -51,14 +51,16 @@ if (!user) {
 
 /** Read a line while showing asterisks instead of the characters. */
 function askHidden(question) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
     let muted = false;
     rl._writeToOutput = (s) => {
       if (!muted) rl.output.write(s);
       else if (s.trim().length) rl.output.write("*");
     };
+    rl.on("close", () => reject(new Error("input closed")));
     rl.question(question, (value) => {
+      rl.removeAllListeners("close");
       rl.close();
       process.stdout.write("\n");
       resolve(value);
@@ -67,17 +69,49 @@ function askHidden(question) {
   });
 }
 
-console.log("\n  Setting the password for " + user.email + "\n");
+/** Everything piped in, when there is no terminal to prompt on. */
+function readPiped() {
+  return new Promise((resolve) => {
+    let buf = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (d) => { buf += d; });
+    process.stdin.on("end", () => resolve(buf.trim()));
+  });
+}
 
-const pw = await askHidden("  New password: ");
+const DRY = process.argv.includes("--dry-run");
+let pw;
+
+if (process.stdin.isTTY) {
+  console.log("\n  Setting the password for " + user.email + "\n");
+  pw = await askHidden("  New password: ");
+  const again = await askHidden("  Again:        ");
+  if (pw !== again) {
+    console.error("\n  Those do not match.\n");
+    process.exit(1);
+  }
+} else {
+  // No terminal: take it from a pipe, so it never lands in shell history.
+  pw = await readPiped();
+  if (!pw) {
+    console.error(
+      "\n  No terminal to prompt on, and nothing piped in.\n" +
+      "\n  Run it in Terminal.app:      node scripts/set-password.mjs" +
+      "\n  or pipe without history:     read -s PW && printf %s \"$PW\" | node scripts/set-password.mjs\n",
+    );
+    process.exit(1);
+  }
+  console.log("\n  Setting the password for " + user.email);
+}
+
 if (pw.length < 8) {
   console.error("\n  Too short - use at least 8 characters.\n");
   process.exit(1);
 }
-const again = await askHidden("  Again:        ");
-if (pw !== again) {
-  console.error("\n  Those do not match.\n");
-  process.exit(1);
+
+if (DRY) {
+  console.log("\n  Dry run: read a password of " + pw.length + " characters. Nothing was written.\n");
+  process.exit(0);
 }
 
 const r = await api("/auth/v1/admin/users/" + user.id, {
