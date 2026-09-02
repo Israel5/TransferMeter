@@ -91,7 +91,9 @@ const payload = quotes.map((q) => ({
   price: Number(q.price) || 0,
   tip: (q.trips || []).reduce((n, t) => n + (Number(t.tip) || 0), 0),
   cost: Number(q.cost) || 0, total_km: Number(q.totalKm) || 0,
-  data: q,
+  // The app reads quotes out of this blob, so the mapped status has to be
+  // written into it too; leaving the old value here drew a blank pill.
+  data: { ...q, status: statusOf(q) },
 }));
 
 const post = async (table, body, conflict) => {
