@@ -5,6 +5,7 @@ import { CounterGroup } from "./Counters";
 import { Meter } from "./Meter";
 import { fmt, dur, niceDate, legInfo, scheduleFor, tripTotals, shortName } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
+import { cleanContact } from "@/lib/whatsapp";
 import { parseCoords } from "@/lib/quote";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "@/lib/types";
 import type { AppState } from "@/lib/state";
@@ -227,7 +228,9 @@ export function Editor({
                   <label className="label" htmlFor="contact">WhatsApp</label>
                   <input id="contact" type="text" className="loc" inputMode="tel"
                          placeholder="514 555 0123, +55 11 …, or @handle"
-                         value={st.contact} onChange={(e) => set({ contact: e.target.value })} />
+                         value={st.contact}
+                         onChange={(e) => set({ contact: e.target.value })}
+                         onBlur={(e) => set({ contact: cleanContact(e.target.value) })} />
                 </div>
               </div>
 

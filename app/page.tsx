@@ -14,7 +14,7 @@ import { draftMessage, quoteMessage, customerPayload, encodePayload } from "@/li
 import { buildPDF } from "@/lib/pdf";
 import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
-import { waDigits, waHandle, waLink } from "@/lib/whatsapp";
+import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
 import { getClient, pull, push, removeQuote, signIn, signOut, type PublicConfig } from "@/lib/supabase";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
@@ -223,15 +223,11 @@ export default function Home() {
       return;
     }
 
-    // A username cannot address a chat, but WhatsApp will still open with the
-    // message written and let you choose who it goes to — better than handing
-    // back a clipboard and leaving you to find the conversation.
-    const handle = waHandle(q.contact);
+    // Nothing saved to address at all: open WhatsApp with the message written
+    // and let the customer be chosen there.
     window.open(`https://wa.me/?text=${encodeURIComponent(body)}`, "_blank", "noopener");
     markSent(q);
-    say(handle
-      ? `Opening WhatsApp — pick @${handle}, there's no number saved for them.`
-      : "Opening WhatsApp — pick the customer, no number is saved for them.");
+    say("Opening WhatsApp — pick the customer, nothing is saved to address them.");
   };
 
   /* ---------- render ---------- */
