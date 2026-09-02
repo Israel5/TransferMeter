@@ -117,6 +117,7 @@ declare
   new_id    text := 'r' || left(replace(gen_random_uuid()::text, '-', ''), 16);
   the_owner uuid;
   recent    int;
+  clean     jsonb;
 begin
   select owner into the_owner from public.config where id;
   if the_owner is null then raise exception 'no driver configured'; end if;
@@ -131,15 +132,42 @@ begin
     raise exception 'a name is required';
   end if;
 
+  -- Never store the caller's object as it arrives. Whatever the request form
+  -- grows into, this is the whole list of what a stranger may put in the
+  -- record: no id to collide with a real quote, no quote number, no status,
+  -- no token, no owner, and nothing unbounded.
+  if length(payload::text) > 8000 then
+    raise exception 'that request is too large';
+  end if;
+
+  clean := jsonb_build_object(
+    'customer', left(trim(payload->>'customer'), 120),
+    'contact',  left(coalesce(trim(payload->>'contact'), ''), 60),
+    'notes',    left(coalesce(trim(payload->>'note'), ''), 1000),
+    'lang',     case when payload->>'lang' in ('pt','en','fr')
+                     then payload->>'lang' else 'pt' end,
+    'origin',   'customer',
+    'trips',    coalesce(jsonb_path_query_first(payload, '$.trips ? (@.type() == "array")'),
+                         '[]'::jsonb),
+    'pax',      coalesce(jsonb_path_query_first(payload, '$.pax  ? (@.type() == "object")'), '{}'::jsonb),
+    'gear',     coalesce(jsonb_path_query_first(payload, '$.gear ? (@.type() == "object")'), '{}'::jsonb),
+    'bags',     coalesce(jsonb_path_query_first(payload, '$.bags ? (@.type() == "object")'), '{}'::jsonb)
+  );
+
+  if jsonb_array_length(clean -> 'trips') > 4 then
+    raise exception 'too many legs in that request';
+  end if;
+
   insert into public.quotes (id, owner, origin, status, customer, contact,
                              first_date, price, data)
   values (new_id, the_owner, 'customer', 'requested',
-          left(trim(payload->>'customer'), 120),
-          left(coalesce(trim(payload->>'contact'), ''), 60),
+          clean->>'customer',
+          clean->>'contact',
           nullif(payload->>'first_date','')::date,
-          -- the estimate the page showed them; you confirm or change it
-          coalesce((payload->>'estimate')::numeric, 0),
-          jsonb_strip_nulls(payload));
+          -- the estimate the page showed them; you confirm or change it,
+          -- and it cannot be negative or absurd
+          least(greatest(coalesce((payload->>'estimate')::numeric, 0), 0), 100000),
+          clean);
 
   return (select share_token from public.quotes where id = new_id);
 end $$;

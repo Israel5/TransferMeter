@@ -139,7 +139,9 @@ export function saveQuote(st: AppState): SaveResult {
   }
 
   return { ok: true, created, quote: snap,
-    state: { ...withNo, quotes: quotes.slice(0, 200), editingId: snap.id } };
+    // Keeping the newest N on screen; nothing is deleted by this, the rest are
+    // still in the database. At a few transfers a week this is decades away.
+    state: { ...withNo, quotes: quotes.slice(0, 2000), editingId: snap.id } };
 }
 
 export function loadQuote(st: AppState, id: string): AppState {

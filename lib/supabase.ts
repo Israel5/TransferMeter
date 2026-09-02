@@ -132,6 +132,22 @@ async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Q
   });
 }
 
+/** Forget every corrected distance. Explicit, because a save must never be
+ *  able to infer this from an empty set it might simply have failed to load. */
+export async function clearLearned(sb: SupabaseClient, owner: string) {
+  const { error } = await sb.from("learned").delete().eq("owner", owner);
+  if (error) throw new Error(error.message);
+}
+
+/** The address a customer's link carries. A quote saved a moment ago has one
+ *  only because the database minted it on insert, so it has to be read back
+ *  before a link can be built from it. */
+export async function fetchShareToken(sb: SupabaseClient, id: string) {
+  const { data, error } = await sb.from("quotes").select("share_token").eq("id", id).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.share_token as string | undefined) ?? null;
+}
+
 /** Changing a status is an act, not a side effect of saving, so it is its own
  *  write. Whoever does it last means it -- the driver reversing an approval a
  *  customer just gave included. */
@@ -170,12 +186,18 @@ export async function push(
   );
   if (e2) throw new Error(e2.message);
 
+  // Absence has to mean something here, or "forget corrected distances" only
+  // clears the screen and the rows return on the next load.
   const pairs = Object.entries(st.learned ?? {});
   if (pairs.length) {
     const { error: e3 } = await sb.from("learned")
       .upsert(pairs.map(([pair, km]) => ({ owner, pair, km })), { onConflict: "owner,pair" });
     if (e3) throw new Error(e3.message);
   }
+  // Deliberately no deletion here. Inferring it from an empty set would mean
+  // that any load which failed to fetch them -- offline, a hiccup, a stale tab
+  // -- looks identical to "forget them all", and the next save would wipe
+  // them. Forgetting is an act, and has its own function below.
 
   return adopted;
 }

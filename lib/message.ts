@@ -64,13 +64,8 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
         pkm: Math.round((t.paxKm ?? 0) * 10) / 10, pmn: Math.round(t.paxMins ?? 0),
       };
     }),
-    x: {
-      ...(countList(q.pax ?? {}, PAX_KEYS, W as any) ? { pax: countList(q.pax ?? {}, PAX_KEYS, W as any) } : {}),
-      ...(countList(q.gear ?? {}, GEAR_KEYS, W as any) ? { gear: countList(q.gear ?? {}, GEAR_KEYS, W as any) } : {}),
-      ...(countList(q.bags ?? {}, BAG_KEYS, W as any) ? { bags: countList(q.bags ?? {}, BAG_KEYS, W as any) } : {}),
-    },
-    // The same counts unrendered, so the customer's page can offer to correct
-    // them rather than only display a sentence built here.
+    // The counts as numbers, once. The customer's page words them itself, so a
+    // correction there cannot leave a stale sentence behind.
     xc: { pax: { ...(q.pax ?? {}) }, gear: { ...(q.gear ?? {}) }, bags: { ...(q.bags ?? {}) } },
     seats: s.seats ?? 7,
     tot: (q.trips ?? []).reduce((n, t) => n + (t.price ?? 0), 0),

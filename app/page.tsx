@@ -16,7 +16,7 @@ import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
-import { getClient, pull, push, setQuoteStatus, removeQuote, rotateShareToken, signIn } from "@/lib/supabase";
+import { getClient, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/supabase";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
@@ -60,6 +60,19 @@ export default function Home() {
   }, []);
 
   /* ---------- persist ---------- */
+  /** Save now and wait for it, for the actions that cannot proceed until the
+   *  quote actually exists in the database. */
+  const persistNow = useCallback(async (next: AppState) => {
+    if (pushTimer.current) clearTimeout(pushTimer.current);
+    if (!sb || !owner) return;
+    setStore("Saving…");
+    try {
+      await push(sb, owner, next, (q) =>
+        customerPayload(q, next.settings, (v: string) => waDigits(v, next.settings)));
+      setStore("Synced");
+    } catch { setStore("Not saved"); throw new Error("Could not save that quote."); }
+  }, [sb, owner]);
+
   const persist = useCallback((next: AppState) => {
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(async () => {
@@ -186,7 +199,10 @@ export default function Home() {
 
   const doDelete = async (id: string) => {
     setSt((prev) => { const next = { ...prev, quotes: prev.quotes.filter((q) => q.id !== id) }; persist(next); return next; });
-    if (sb && owner) { try { await removeQuote(sb, id); } catch {} }
+    if (sb && owner) {
+      try { await removeQuote(sb, id); }
+      catch { setStore("Not saved"); say("That quote could not be deleted — it will come back when you reload."); }
+    }
   };
 
   const savePdf = (q: Quote) => {
@@ -213,7 +229,24 @@ export default function Home() {
     const base = (st.settings.customerPage ?? "").trim().replace(/[#?].*$/, "")
       || `${location.origin}/quote`;
     const isPrivate = /^https?:\/\/(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(base);
-    return { link: `${base}#t=${q.shareToken ?? ""}`, isPrivate };
+    // Without a token the link opens an empty page. Better to say so than to
+    // hand over an address that quietly leads nowhere.
+    return { link: `${base}#t=${q.shareToken ?? ""}`, isPrivate, usable: !!q.shareToken };
+  };
+
+  /** The quote as the database knows it, with the token its link needs. Saves
+   *  first if the editor is holding unsaved work, because a link to a quote
+   *  that was never stored is a link to nothing. */
+  const linkable = async (q: Quote): Promise<Quote | null> => {
+    if (q.shareToken) return q;
+    if (!sb || !owner) { say("Sign in first — a customer link lives in the database."); return null; }
+    try {
+      const token = await fetchShareToken(sb, q.id);
+      if (!token) { say("That quote has not finished saving yet. Try again in a moment."); return null; }
+      setSt((prev) => ({ ...prev,
+        quotes: prev.quotes.map((x) => (x.id === q.id ? { ...x, shareToken: token } : x)) }));
+      return { ...q, shareToken: token };
+    } catch (e) { say((e as Error).message); return null; }
   };
 
   /** Retire the link that was sent and issue a new address for this quote.
@@ -234,7 +267,9 @@ export default function Home() {
   };
 
   /** Hand the link over for pasting anywhere — email, SMS, anything. */
-  const copyLink = async (q: Quote) => {
+  const copyLink = async (qIn: Quote) => {
+    const q = await linkable(qIn);
+    if (!q) return;
     const { link, isPrivate } = customerLinkFor(q);
     if (isPrivate) {
       say("This address only works on your own network — send from the deployed site.");
@@ -249,7 +284,24 @@ export default function Home() {
     }
   };
 
-  const sendQuote = (q: Quote) => {
+  /** Every editor action that acts on "this quote" has to save it first and
+   *  keep what the save returned. Discarding it, as these used to, left the
+   *  quote unstored, its number reusable, and its link pointing at nothing. */
+  const saveThen = async (act: (q: Quote) => void | Promise<void>, needsDatabase = true) => {
+    const r = saveQuote(st);
+    if (!r.ok) { say(r.message); return; }
+    setSt(r.state);
+    if (needsDatabase) {
+      try { await persistNow(r.state); } catch (e) { say((e as Error).message); return; }
+    } else {
+      persist(r.state);
+    }
+    await act(r.quote);
+  };
+
+  const sendQuote = async (qIn: Quote) => {
+    const q = await linkable(qIn);
+    if (!q) return;
     const W = wordsFor(q.lang);
     const { link, isPrivate } = customerLinkFor(q);
     const intro = { pt: "Segue o orçamento do seu transfer", en: "Here is your transfer quote",
@@ -333,9 +385,9 @@ export default function Home() {
                 mapsLeg={mapsLeg} mapsRoute={mapsRoute}
                 quoteText={draftMessage(st)}
                 onSave={doSave}
-                onSend={() => sendQuote(saveQuote(st).ok ? (saveQuote(st) as any).quote : ({} as Quote))}
-                onPdf={() => { const r = saveQuote(st); if (r.ok) savePdf(r.quote); else say(r.message); }}
-                onCopyLink={() => { const r = saveQuote(st); if (r.ok) { setSt(r.state); persist(r.state); copyLink(r.quote); } else say(r.message); }}
+                onSend={() => saveThen(sendQuote)}
+                onPdf={() => saveThen(async (q) => savePdf(q), false)}
+                onCopyLink={() => saveThen(copyLink)}
                 onNewQuote={() => { const next = newQuote(st); setSt(next); persist(next); }}
                 onBack={() => setView("list")}
                 flash={flash} />
@@ -346,7 +398,13 @@ export default function Home() {
       <SettingsPanel settings={st.settings} learnedCount={Object.keys(st.learned).length}
                      quotes={st.quotes}
                      onChange={(patch) => set({ settings: { ...st.settings, ...patch } })}
-                     onClearLearned={() => set({ learned: {} })} />
+                     onClearLearned={() => {
+                       set({ learned: {} });
+                       if (sb && owner) {
+                         clearLearned(sb, owner)
+                           .catch(() => say("Those distances could not be forgotten — they will return on reload."));
+                       }
+                     }} />
     </div>
   );
 }

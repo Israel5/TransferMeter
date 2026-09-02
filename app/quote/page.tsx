@@ -20,7 +20,6 @@ type Payload = {
   b?: string; p?: string; w?: string; n?: string; c?: string;
   l?: "pt" | "en" | "fr";
   t?: Leg[];
-  x?: { pax?: string; gear?: string; bags?: string };
   xc?: { pax?: Counts; gear?: Counts; bags?: Counts };
   seats?: number;
   tot?: number;
@@ -66,6 +65,7 @@ const T = {
         noneSub: "Peça um novo link ao seu motorista.",
         thanksYes: "Obrigado! O seu transfer está confirmado.",
         thanksNo: "Tudo bem — o motorista foi avisado.",
+        notReady: "Este orçamento ainda está a ser preparado pelo motorista.",
         sending: "A enviar…", stops: "Percurso",
         yourRide: "A sua viagem", totalDriven: "Percurso total do motorista",
         failed: "Não foi possível registar a sua resposta. Tente novamente.",
@@ -83,6 +83,7 @@ const T = {
         noneSub: "Ask your driver for a new link.",
         thanksYes: "Thank you — your transfer is confirmed.",
         thanksNo: "No problem — your driver has been told.",
+        notReady: "Your driver is still preparing this quote.",
         sending: "Sending…", stops: "Route",
         yourRide: "Your journey", totalDriven: "Total driven by the driver",
         failed: "That didn't go through. Please try again.",
@@ -100,6 +101,7 @@ const T = {
         noneSub: "Demandez un nouveau lien à votre chauffeur.",
         thanksYes: "Merci — votre transfert est confirmé.",
         thanksNo: "Très bien — votre chauffeur est prévenu.",
+        notReady: "Votre chauffeur prépare encore ce devis.",
         sending: "Envoi…", stops: "Trajet",
         yourRide: "Votre trajet", totalDriven: "Trajet total du chauffeur",
         failed: "L'envoi a échoué. Réessayez.",
@@ -168,6 +170,9 @@ export default function CustomerQuote() {
   const L = T[q?.l ?? "pt"] ?? T.pt;
   const dict = ITEM[q?.l ?? "pt"] ?? ITEM.pt;
   const answered = status === "approved" || status === "declined";
+  // Only a quote the driver has actually sent is open to an answer; the
+  // database enforces this, so the page must not invite one it will refuse.
+  const answerable = status === "sent";
 
   const counts: Record<string, Counts> = useMemo(() => ({
     pax: q?.xc?.pax ?? {}, gear: q?.xc?.gear ?? {}, bags: q?.xc?.bags ?? {},
@@ -301,7 +306,7 @@ export default function CustomerQuote() {
         <section className="cq-section">
           <div className="cq-h-row">
             <h2 className="cq-h">{L.review}</h2>
-            {!answered && !editing && (
+            {answerable && !editing && (
               <button type="button" className="cq-link" onClick={startEdit}>{L.edit}</button>
             )}
           </div>
@@ -372,6 +377,8 @@ export default function CustomerQuote() {
             <span className="cq-mark">{status === "approved" ? "✓" : "×"}</span>
             <p>{status === "approved" ? L.thanksYes : L.thanksNo}</p>
           </div>
+        ) : !answerable ? (
+          <p className="cq-q">{L.notReady}</p>
         ) : (
           <>
             <p className="cq-q">{L.ask}</p>
