@@ -6,14 +6,16 @@ import { dedupeQuotes } from "./state";
 import type { Quote, Settings } from "./types";
 import { DEFAULTS } from "./types";
 
-export type PublicConfig = { supabase: { url: string; anonKey: string } | null; country: string };
-
 let client: SupabaseClient | null = null;
 
-export function getClient(cfg: PublicConfig["supabase"]) {
-  if (!cfg) return null;
+/** Compiled in at build time from Vercel's environment. Both values are public
+ *  by design; row-level security is what actually guards the data. */
+export function getClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return null;
   if (!client) {
-    client = createClient(cfg.url, cfg.anonKey, {
+    client = createClient(url, anon, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
   }

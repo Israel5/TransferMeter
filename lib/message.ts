@@ -1,43 +1,10 @@
-import { fmt, dur, niceDate, countList, customerView, customerRoute, shortName, tripTotals } from "./quote";
+import { fmt, dur, niceDate, countList, customerRoute, shortName, tripTotals } from "./quote";
 import { wordsFor } from "./words";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "./types";
 import type { AppState } from "./state";
 import type { Quote, Settings } from "./types";
 
-/** The quote as a message. Built from a saved snapshot, or from the editor. */
-export function quoteMessage(q: Quote): string {
-  const W = wordsFor(q.lang);
-  const parts: string[] = [];
-  parts.push("Transfer" + (q.customer ? ` — ${q.customer}` : ""));
-  if (q.quoteNo) parts.push(`${W.no} ${q.quoteNo}`);
-  parts.push("");
-
-  (q.trips ?? []).forEach((t) => {
-    const v = customerView(t.stops, t.legKm, t.paxKm, t.paxMins);
-    const named = v.stops.map((s) => shortName(s.name || ""));
-    parts.push((t.label === "Return" ? W.ret : W.out)
-      + (t.date ? ` · ${niceDate(t.date, q.lang)}` : "")
-      + (t.time ? ` · ${W.at} ${t.time}` : ""));
-    parts.push(`${named[0] ?? "—"} → ${named[named.length - 1] ?? "—"}`);
-    parts.push(`${fmt(v.km, 0)} km · ${dur(v.mins)} · $${fmt(t.price, 0)} CAD`);
-    parts.push("");
-  });
-
-  const p = countList(q.pax ?? {}, PAX_KEYS, W as any);
-  const g = countList(q.gear ?? {}, GEAR_KEYS, W as any);
-  const b = countList(q.bags ?? {}, BAG_KEYS, W as any);
-  if (p) parts.push(`${W.pax}: ${p}`);
-  if (g) parts.push(`${W.gear}: ${g}`);
-  if (b) parts.push(`${W.bags}: ${b}`);
-  if (p || g || b) parts.push("");
-
-  parts.push(`${W.total}: $${fmt((q.trips ?? []).reduce((n, t) => n + (t.price ?? 0), 0), 0)} CAD`);
-  parts.push("");
-  parts.push(W.note);
-  return parts.join("\n");
-}
-
-/** The editor's live version, before anything is saved. */
+/** The quote as a message, for the box the driver reads and copies. */
 export function draftMessage(st: AppState): string {
   const W = wordsFor(st.lang);
   const parts: string[] = [];
@@ -72,6 +39,9 @@ export function draftMessage(st: AppState): string {
 }
 
 /** What a customer link carries. Never the home address, cost, tip or notes. */
+/** What a customer is shown: the whole route with the driver's own stops named
+ *  by role, their totals, and nothing else. Stored beside the quote so this is
+ *  the only definition of it. */
 export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => string) {
   const W = wordsFor(q.lang);
   return {
@@ -98,19 +68,4 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
     },
     tot: (q.trips ?? []).reduce((n, t) => n + (t.price ?? 0), 0),
   };
-}
-
-export function encodePayload(obj: unknown) {
-  const bytes = new TextEncoder().encode(JSON.stringify(obj));
-  let bin = "";
-  bytes.forEach((b) => { bin += String.fromCharCode(b); });
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-export function decodePayload(str: string) {
-  const b64 = str.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return JSON.parse(new TextDecoder().decode(bytes));
 }

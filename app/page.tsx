@@ -10,25 +10,22 @@ import {
   initialState, loadQuote, newQuote, saveQuote, dedupeQuotes,
   type AppState,
 } from "@/lib/state";
-import { draftMessage, quoteMessage, customerPayload, encodePayload } from "@/lib/message";
+import { draftMessage, customerPayload } from "@/lib/message";
 import { buildPDF } from "@/lib/pdf";
 import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
-import { getClient, pull, push, removeQuote, rotateShareToken, signIn, signOut, type PublicConfig } from "@/lib/supabase";
+import { getClient, pull, push, removeQuote, rotateShareToken, signIn } from "@/lib/supabase";
 import type { Quote, Settings, Stop, Trip } from "@/lib/types";
-
-const LOCAL_KEY = "transfer-meter-v3";
 
 export default function Home() {
   const [st, setSt] = useState<AppState>(initialState);
   const [view, setView] = useState<"list" | "quote" | "calendar">("list");
-  const [cfg, setCfg] = useState<PublicConfig | null>(null);
   const [sb, setSb] = useState<SupabaseClient | null>(null);
   const [owner, setOwner] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
-  const [live, setLive] = useState(false);
+  const live = true;   // the Maps proxy is always there
   const [store, setStore] = useState("This browser");
   const [flash, setFlash] = useState("");
   const [email, setEmail] = useState("");
@@ -40,35 +37,24 @@ export default function Home() {
   const routeSeq = useRef(0);
   const say = (t: string) => { setFlash(t); setTimeout(() => setFlash((f) => (f === t ? "" : f)), 3500); };
 
-  /* ---------- boot: config, then session, then data ---------- */
+  /* ---------- boot: session, then data ---------- */
   useEffect(() => {
     (async () => {
-      let c: PublicConfig | null = null;
-      try { c = await fetch("/api/config", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)); } catch {}
-      setCfg(c);
-      setLive(!!c);
-
-      const client = getClient(c?.supabase ?? null);
+      const client = getClient();
       setSb(client);
+      if (!client) { setBooted(true); return; }
 
-      if (client) {
-        const { data } = await client.auth.getSession();
-        const uid = data.session?.user?.id ?? null;
-        setOwner(uid);
-        if (uid) {
-          try {
-            const remote = await pull(client);
-            if (remote) setSt((prev) => ({ ...prev, ...remote } as AppState));
-            setStore("Synced");
-          } catch (e) { setStore("Not saved"); }
-        }
-        client.auth.onAuthStateChange((_e, s) => setOwner(s?.user?.id ?? null));
-      } else {
+      const { data } = await client.auth.getSession();
+      const uid = data.session?.user?.id ?? null;
+      setOwner(uid);
+      if (uid) {
         try {
-          const raw = localStorage.getItem(LOCAL_KEY);
-          if (raw) setSt((prev) => ({ ...prev, ...JSON.parse(raw) }));
-        } catch {}
+          const remote = await pull(client);
+          if (remote) setSt((prev) => ({ ...prev, ...remote } as AppState));
+          setStore("Synced");
+        } catch { setStore("Not saved"); }
       }
+      client.auth.onAuthStateChange((_e, s) => setOwner(s?.user?.id ?? null));
       setBooted(true);
     })();
   }, []);
@@ -81,12 +67,10 @@ export default function Home() {
         setStore("Saving…");
         try {
           await push(sb, owner, next, (q) =>
-            customerPayload(q, next.settings, (v) => waDigits(v, next.settings)));
+            customerPayload(q, next.settings, (v: string) => waDigits(v, next.settings)));
           setStore("Synced");
         }
         catch (e) { setStore("Not saved"); }
-      } else {
-        try { localStorage.setItem(LOCAL_KEY, JSON.stringify(next)); } catch {}
       }
     }, 600);
   }, [sb, owner]);
@@ -214,10 +198,7 @@ export default function Home() {
     const base = (st.settings.customerPage ?? "").trim().replace(/[#?].*$/, "")
       || `${location.origin}/quote`;
     const isPrivate = /^https?:\/\/(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(base);
-    const link = q.shareToken
-      ? `${base}#t=${q.shareToken}`
-      : `${base}#q=${encodePayload(customerPayload(q, st.settings, (v) => waDigits(v, st.settings)))}`;
-    return { link, isPrivate };
+    return { link: `${base}#t=${q.shareToken ?? ""}`, isPrivate };
   };
 
   /** Retire the link that was sent and issue a new address for this quote.
@@ -259,9 +240,7 @@ export default function Home() {
     const intro = { pt: "Segue o orçamento do seu transfer", en: "Here is your transfer quote",
                     fr: "Voici le devis de votre transfert" }[q.lang] ?? "Here is your transfer quote";
 
-    const body = isPrivate
-      ? quoteMessage(q)
-      : `${intro}${q.quoteNo ? ` (${W.no} ${q.quoteNo})` : ""}:\n${link}`;
+    const body = `${intro}${q.quoteNo ? ` (${W.no} ${q.quoteNo})` : ""}:\n${link}`;
 
     const wa = waLink(q.contact, body, st.settings);
     if (wa) {

@@ -1,6 +1,6 @@
 import { DEFAULTS, emptyPax, emptyGear, emptyBags } from "./types";
 import type { Counts, Lang, Quote, SavedTrip, Settings, Stop, Trip } from "./types";
-import { tripTotals, grandTotals, customerView } from "./quote";
+import { tripTotals, grandTotals } from "./quote";
 
 export type AppState = {
   settings: Settings;
@@ -186,9 +186,3 @@ export const owedOn = (q: Quote) =>
 
 export const tipTotal = (q: Quote) =>
   (q.trips ?? []).reduce((n, t) => n + (Number(t.tip) || 0), 0);
-
-export function customerTrips(q: Quote) {
-  return (q.trips ?? []).map((t) => ({
-    ...t, view: customerView(t.stops, t.legKm, t.paxKm, t.paxMins),
-  }));
-}

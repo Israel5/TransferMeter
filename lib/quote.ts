@@ -126,24 +126,6 @@ export function grandTotals(trips: Trip[], s: Settings, learned: Record<string, 
   );
 }
 
-/* ---------- the leg the customer sees ---------- */
-
-export function customerView(stops: Stop[], legKm: (number | null)[], paxKm?: number, paxMins?: number) {
-  let first = -1, last = -1;
-  stops.forEach((st, i) => {
-    if (!st.base && String(st.name || "").trim()) { if (first < 0) first = i; last = i; }
-  });
-  if (first < 0 || last <= first) {
-    return { stops: first >= 0 ? [stops[first]] : [], legKm: [] as number[], km: paxKm ?? 0, mins: paxMins ?? 0 };
-  }
-  const sub = legKm.slice(first, last).map((n) => Number(n) || 0);
-  return {
-    stops: stops.slice(first, last + 1),
-    legKm: sub,
-    km: paxKm ?? sub.reduce((n, k) => n + k, 0),
-    mins: paxMins ?? 0,
-  };
-}
 
 /** The whole route as a customer should read it: every stop and every leg, but
  *  the driver's own address replaced by what it is rather than where it is.

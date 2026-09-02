@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { decodePayload } from "@/lib/message";
-import { getClient, fetchQuoteByToken, answerQuote, type PublicConfig } from "@/lib/supabase";
+import { getClient, fetchQuoteByToken, answerQuote } from "@/lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /* The quote travels inside the link. This page stores nothing and knows nothing
@@ -75,16 +74,12 @@ export default function CustomerQuote() {
 
   useEffect(() => {
     (async () => {
-      const hash = window.location.hash.replace(/^#/, "");
-      const t = hash.match(/(?:^|&)t=([^&]+)/)?.[1] ?? null;
-      const payload = hash.match(/(?:^|&)q=([^&]+)/)?.[1] ?? null;
-
+      const t = window.location.hash.replace(/^#/, "").match(/(?:^|&)t=([^&]+)/)?.[1] ?? null;
       if (t) {
-        // The quote lives in the database; read the current version so a price
-        // changed after sending is the one they actually see.
+        // Read the current version, so a price changed after sending is the
+        // one they actually see.
         try {
-          const cfg: PublicConfig = await fetch("/api/config", { cache: "no-store" }).then((r) => r.json());
-          const client = getClient(cfg.supabase);
+          const client = getClient();
           if (client) {
             setSb(client);
             setToken(t);
@@ -95,8 +90,6 @@ export default function CustomerQuote() {
             }
           }
         } catch { /* falls through to the empty state */ }
-      } else if (payload) {
-        try { setQ(decodePayload(payload) as Payload); } catch { /* empty state */ }
       }
       setReady(true);
     })();
@@ -129,12 +122,6 @@ export default function CustomerQuote() {
       </div>
     );
   }
-
-  const reply = (text: string) => {
-    const msg = `${text}${q.n ? ` ${q.n}` : ""}${q.c ? ` — ${q.c}` : ""}.`;
-    return q.w ? `https://wa.me/${q.w}?text=${encodeURIComponent(msg)}`
-               : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-  };
 
   const answered = status === "approved" || status === "declined";
 
@@ -202,24 +189,14 @@ export default function CustomerQuote() {
           <>
             <p>{L.ask}</p>
             <div className="choice">
-              {token ? (
-                <>
-                  <button className="yes" type="button" disabled={busy} onClick={() => answer("approved")}>
-                    {busy ? L.sending : L.yes}
-                  </button>
-                  <button className="no" type="button" disabled={busy} onClick={() => answer("declined")}>
-                    {L.no}
-                  </button>
-                </>
-              ) : (
-                <>
-                  <a className="yes" href={reply(L.okMsg)} target="_blank" rel="noopener">{L.yes}</a>
-                  <a className="no" href={reply(L.noMsg)} target="_blank" rel="noopener">{L.no}</a>
-                </>
-              )}
+              <button className="yes" type="button" disabled={busy} onClick={() => answer("approved")}>
+                {busy ? L.sending : L.yes}
+              </button>
+              <button className="no" type="button" disabled={busy} onClick={() => answer("declined")}>
+                {L.no}
+              </button>
             </div>
             {failed && <p className="note bad">{L.failed}</p>}
-            {!token && <p className="note">{L.foot}</p>}
           </>
         )}
       </div>

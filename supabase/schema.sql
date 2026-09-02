@@ -36,6 +36,7 @@ create table if not exists public.quotes (
   data         jsonb  not null,                     -- the full snapshot, unchanged
   share_token  text not null unique
                  default replace(gen_random_uuid()::text, '-', ''),
+  customer_view jsonb,          -- what the customer is shown, decided by the app
   answered_at  timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -95,60 +96,6 @@ create policy "owner owns learned"  on public.learned
 revoke all on public.quotes, public.settings, public.learned, public.config from anon;
 revoke all on all tables in schema public from anon;
 
--- ------------------------------------------------------- customer access ---
--- Only what a customer should see: their legs, their totals, your name.
--- Deliberately no home address, no cost, no tip, no notes, no contact.
-create or replace function public.quote_by_token(token text)
-returns jsonb
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare q public.quotes%rowtype;
-begin
-  select * into q from public.quotes where share_token = token;
-  if not found then return null; end if;
-
-  return jsonb_build_object(
-    'quote_no', q.quote_no,
-    'customer', q.customer,
-    'status',   q.status,
-    'price',    q.price,
-    'lang',     coalesce(q.data->>'lang', 'pt'),
-    'trips',    coalesce(q.data->'customerTrips', '[]'::jsonb),
-    'extras',   coalesce(q.data->'customerExtras', '{}'::jsonb),
-    'biz',      coalesce(q.data->'biz', '{}'::jsonb)
-  );
-end $$;
-
--- The one thing a customer may change, and only to these two values.
-create or replace function public.answer_quote(token text, answer text)
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if answer not in ('approved','declined') then
-    raise exception 'answer must be approved or declined';
-  end if;
-
-  update public.quotes
-     set status      = answer,
-         answered_at = now(),
-         updated_at  = now()
-   where share_token = token
-     and status in ('sent','approved','declined');   -- never a draft or a request
-
-  if not found then raise exception 'that quote is not awaiting an answer'; end if;
-  return answer;
-end $$;
-
-revoke all on function public.quote_by_token(text) from public;
-revoke all on function public.answer_quote(text, text) from public;
-grant execute on function public.quote_by_token(text) to anon, authenticated;
-grant execute on function public.answer_quote(text, text) to anon, authenticated;
-
 -- ------------------------------------------------- customer asks for one ---
 -- A stranger may create a request and nothing else. They cannot choose the
 -- price, the status, or whose books it lands in — this function decides all
@@ -201,3 +148,94 @@ begin new.updated_at = now(); return new; end $$;
 drop trigger if exists quotes_touch on public.quotes;
 create trigger quotes_touch before update on public.quotes
   for each row execute function public.touch_updated_at();
+
+
+-- Self-provisioning, then closed.
+--
+-- The first account created becomes the owner and is written into config, and
+-- every attempt after it is refused. Nobody who finds the site can register,
+-- whether the account is made here or in the dashboard.
+
+create or replace function public.claim_first_account()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare existing int;
+begin
+  select count(*) into existing from auth.users where id <> new.id;
+
+  if existing > 0 then
+    raise exception 'This installation already has an owner.'
+      using errcode = '42501';
+  end if;
+
+  -- The first account owns the data, and customer requests land in its books.
+  insert into public.config (id, owner) values (true, new.id)
+    on conflict (id) do update set owner = excluded.owner;
+
+  return new;
+end $$;
+
+drop trigger if exists claim_first_account on auth.users;
+create trigger claim_first_account
+  after insert on auth.users
+  for each row execute function public.claim_first_account();
+
+
+-- Let a customer read and answer their own quote, with no table access.
+--
+-- What they may see is decided by the application when it saves, and stored in
+-- customer_view: their legs, their totals, the driver's name. Never the home
+-- address, the fuel cost, the tip or the notes. The database just serves that
+-- column, so there is one place where the rule lives.
+
+create or replace function public.quote_by_token(token text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare q public.quotes%rowtype;
+begin
+  select * into q from public.quotes where share_token = token;
+  if not found then return null; end if;
+
+  -- A draft has not been sent to anyone; it should not be readable yet.
+  if q.status = 'draft' then return null; end if;
+
+  return coalesce(q.customer_view, '{}'::jsonb)
+       || jsonb_build_object('status', q.status, 'answered_at', q.answered_at);
+end $$;
+
+drop function if exists public.answer_quote(text, text);
+create function public.answer_quote(token text, answer text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare q public.quotes%rowtype;
+begin
+  if answer not in ('approved','declined') then
+    raise exception 'answer must be approved or declined';
+  end if;
+
+  update public.quotes
+     set status      = answer,
+         answered_at = now(),
+         updated_at  = now()
+   where share_token = token
+     and status in ('sent','approved','declined')   -- never a draft or a request
+  returning * into q;
+
+  if not found then raise exception 'that quote is not awaiting an answer'; end if;
+
+  return jsonb_build_object('status', q.status, 'answered_at', q.answered_at);
+end $$;
+
+revoke all on function public.quote_by_token(text) from public;
+revoke all on function public.answer_quote(text, text) from public;
+grant execute on function public.quote_by_token(text) to anon, authenticated;
+grant execute on function public.answer_quote(text, text) to anon, authenticated;

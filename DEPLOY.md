@@ -4,7 +4,7 @@ Two services. Vercel serves the pages and holds the Google key; Supabase holds
 the data and decides who may read it.
 
 ```
-Vercel     /            the app (behind a login once it is public)
+Vercel     /            the app, behind a sign-in
            /quote       what a customer opens from your link
            /api/*       Google Maps proxy — the key never reaches a browser
 Supabase   quotes, settings, learned + auth + row-level security
@@ -20,16 +20,22 @@ made for you.
 **2. Put the credentials in `.env`** (already gitignored — never commit it):
 
 ```sh
-GOOGLE_MAPS_API_KEY=AIza…            # already there
+GOOGLE_MAPS_API_KEY=AIza…
+ADDRESS_LOOKUP_COUNTRY=ca
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ…    # public by design; RLS is the guard
+
+# local only, never on a host
 SUPABASE_URL=https://xxxx.supabase.co
-SUPABASE_ANON_KEY=eyJ…               # safe to expose; RLS is what protects you
-SUPABASE_SERVICE_KEY=eyJ…            # NEVER goes in a browser or a repo
-SUPABASE_DB_URL=postgresql://postgres:…@db.xxxx.supabase.co:5432/postgres
+SUPABASE_SERVICE_KEY=eyJ…
+SUPABASE_DB_URL=postgresql://…
 ```
 
-**3. Vercel** — `vercel link`, then add the same variables under
-Settings → Environment Variables. `SUPABASE_ANON_KEY` and `SUPABASE_URL` are
-the only two the browser ever sees.
+Vercel needs the first four and nothing else.
+
+**3. Vercel** — Settings → Environment Variables, the four marked deployed in
+`.env.example`. The two `NEXT_PUBLIC_` ones are compiled into the browser
+bundle; the Google key stays on the server.
 
 Note the Hobby plan forbids commercial use; this is a business tool, so it needs
 Pro or a host whose free tier allows it.
@@ -61,19 +67,6 @@ node scripts/set-password.mjs
 
 It prompts on your machine with the input hidden and writes it through the admin
 API. Nothing is emailed and the service key never leaves your laptop.
-
-## Moving the old quotes across
-
-The previous version kept everything in `data.db`. Once your account exists:
-
-```sh
-node scripts/migrate-sqlite.mjs            # shows what would move
-node scripts/migrate-sqlite.mjs --write    # moves it
-```
-
-It reads the SQLite file directly and upserts by quote id, so running it twice
-changes nothing. Tips, payment flags, notes, statuses and corrected distances
-all come across intact.
 
 ## Local development
 
