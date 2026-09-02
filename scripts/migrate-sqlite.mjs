@@ -77,10 +77,16 @@ if (!WRITE) { console.log("\n  dry run. Re-run with --write to move these across
 
 /* ---------- write ---------- */
 const firstDate = (q) => ((q.trips || []).map((t) => t.date).filter(Boolean).sort()[0] || null);
+
+// The old app had one "pending" state meaning "saved, waiting on the customer".
+// That has since split into draft (not sent yet) and sent (awaiting an answer),
+// and the old data cannot say which. "sent" matches what it used to mean.
+const STATUS = { pending: "sent", approved: "approved", declined: "declined" };
+const statusOf = (q) => STATUS[q.status] ?? (["draft","requested","sent","approved","declined"].includes(q.status) ? q.status : "draft");
 const payload = quotes.map((q) => ({
   id: q.id, owner,
   quote_no: q.quoteNo || null, customer: q.customer || null, contact: q.contact || null,
-  notes: q.notes || null, status: q.status || "draft", origin: "driver",
+  notes: q.notes || null, status: statusOf(q), origin: "driver",
   first_date: firstDate(q),
   price: Number(q.price) || 0,
   tip: (q.trips || []).reduce((n, t) => n + (Number(t.tip) || 0), 0),
