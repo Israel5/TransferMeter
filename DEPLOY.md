@@ -40,14 +40,10 @@ bundle; the Google key stays on the server.
 Note the Hobby plan forbids commercial use; this is a business tool, so it needs
 Pro or a host whose free tier allows it.
 
-## What can be done from here
+## The database
 
-Once `.env` has those values:
-
-- run `supabase/schema.sql` against the database
-- port storage from `/api/state` to Supabase
-- add the login
-- point `quote.html` at `quote_by_token` / `answer_quote`
+One file holds all of it — tables, row-level security, and the three functions
+a customer's link is allowed to call. It is safe to re-run.
 
 ```sh
 psql "$SUPABASE_DB_URL" -f supabase/schema.sql

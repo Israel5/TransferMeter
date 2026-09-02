@@ -58,9 +58,15 @@ tested on their own.
 
 ## Environment
 
-Copy `.env.example` to `.env`. Only `GOOGLE_MAPS_API_KEY` is needed to run;
-adding `SUPABASE_URL` and `SUPABASE_ANON_KEY` turns on sign-in and shared
-storage. Without them the app keeps everything in the browser.
+Copy `.env.example` to `.env`. Four variables run the app: the Google key, the
+country to bias addresses to, and the Supabase URL and anon key.
 
-The Google key and the Supabase service key are read only on the server and are
-never sent to a browser.
+The Google key is read on the server only, which is why Google is reached
+through `/api` rather than from the page. The two `NEXT_PUBLIC_` values are
+compiled into the bundle and are meant to be public — the anon role has no
+privilege on any table, so a signed-out visitor can call exactly the three
+functions a customer's link needs and nothing else.
+
+The service key and the database URL are for migrations and
+`scripts/set-password.mjs`. They stay on your machine; no deployed file reads
+them.
