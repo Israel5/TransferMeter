@@ -1,0 +1,36 @@
+# secrets — never commit
+.env
+.env.*
+!.env.example
+
+# your customers' data
+*.db
+*.db-wal
+*.db-shm
+*.db.backup-*
+*.db.before-cleanup-*
+data.json
+data.json.*
+
+# noise
+node_modules/
+*.log
+.DS_Store
+.vercel
+*.pdf
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+.env.local
+tsconfig.tsbuildinfo
+
+# The previous single-file app, kept locally so it can still be run
+# against data.db while the Next.js version is being finished.
+/index.html
+/quote.html
+/server.js
+/store.js
+/lib/maps.js
+/api/

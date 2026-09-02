@@ -1,0 +1,203 @@
+-- Transfer Meter — Supabase schema
+--
+-- Two audiences with very different rights:
+--   you        signed in, own every row, full access
+--   a customer not signed in, holds only a link, may read ONE quote and
+--              answer it — nothing else
+--
+-- The customer never touches these tables directly. Access is revoked and
+-- given back through two security-definer functions that take the link's
+-- token, so the boundary is enforced by Postgres rather than by client code.
+
+-- ---------------------------------------------------------------- quotes ---
+create table if not exists public.quotes (
+  seq          bigint generated always as identity,
+  id           text primary key,                    -- minted by the page, works offline
+  owner        uuid not null references auth.users(id) on delete cascade,
+  quote_no     text,
+  customer     text,
+  contact      text,
+  notes        text,
+  -- Where the quote came from, and who is waiting on whom:
+  --   draft      you saved it, not sent yet          → you
+  --   requested  the customer asked for it           → you
+  --   sent       you sent it, awaiting their answer  → them
+  --   approved   they accepted
+  --   declined   they said no, or you turned down a request
+  origin       text not null default 'driver'
+                 check (origin in ('driver','customer')),
+  status       text not null default 'draft'
+                 check (status in ('draft','requested','sent','approved','declined')),
+  first_date   date,                                -- earliest leg, for the calendar
+  price        numeric not null default 0,
+  tip          numeric not null default 0,
+  cost         numeric not null default 0,
+  total_km     numeric not null default 0,
+  data         jsonb  not null,                     -- the full snapshot, unchanged
+  share_token  text not null unique
+                 default replace(gen_random_uuid()::text, '-', ''),
+  answered_at  timestamptz,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  unique (owner, quote_no)
+);
+
+create index if not exists quotes_owner_date on public.quotes (owner, first_date desc);
+create index if not exists quotes_owner_status on public.quotes (owner, status);
+
+-- Who new customer requests belong to. One driver, one row.
+create table if not exists public.config (
+  id    boolean primary key default true check (id),
+  owner uuid not null references auth.users(id) on delete cascade
+);
+alter table public.config enable row level security;
+create policy "owner reads config" on public.config
+  for select using (auth.uid() = owner);
+
+-- --------------------------------------------------- settings & distances ---
+create table if not exists public.settings (
+  owner      uuid primary key references auth.users(id) on delete cascade,
+  data       jsonb not null default '{}'::jsonb,     -- car, fuel, bands, your details
+  draft      jsonb not null default '{}'::jsonb,     -- the trip open in the editor
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.learned (
+  owner uuid not null references auth.users(id) on delete cascade,
+  pair  text not null,                               -- "place a|place b", sorted
+  km    numeric not null,
+  primary key (owner, pair)
+);
+
+-- ------------------------------------------------------------------- rls ---
+alter table public.quotes   enable row level security;
+alter table public.settings enable row level security;
+alter table public.learned  enable row level security;
+
+-- You, signed in, own your rows and nothing else.
+create policy "owner reads own quotes"   on public.quotes
+  for select using (auth.uid() = owner);
+create policy "owner writes own quotes"  on public.quotes
+  for insert with check (auth.uid() = owner);
+create policy "owner updates own quotes" on public.quotes
+  for update using (auth.uid() = owner) with check (auth.uid() = owner);
+create policy "owner deletes own quotes" on public.quotes
+  for delete using (auth.uid() = owner);
+
+create policy "owner owns settings" on public.settings
+  for all using (auth.uid() = owner) with check (auth.uid() = owner);
+create policy "owner owns learned"  on public.learned
+  for all using (auth.uid() = owner) with check (auth.uid() = owner);
+
+-- Anonymous visitors get no table access at all.
+-- Supabase grants anon full table privileges by default; take them all back.
+-- RLS would still refuse, but the grant should not be there to begin with.
+revoke all on public.quotes, public.settings, public.learned, public.config from anon;
+revoke all on all tables in schema public from anon;
+
+-- ------------------------------------------------------- customer access ---
+-- Only what a customer should see: their legs, their totals, your name.
+-- Deliberately no home address, no cost, no tip, no notes, no contact.
+create or replace function public.quote_by_token(token text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare q public.quotes%rowtype;
+begin
+  select * into q from public.quotes where share_token = token;
+  if not found then return null; end if;
+
+  return jsonb_build_object(
+    'quote_no', q.quote_no,
+    'customer', q.customer,
+    'status',   q.status,
+    'price',    q.price,
+    'lang',     coalesce(q.data->>'lang', 'pt'),
+    'trips',    coalesce(q.data->'customerTrips', '[]'::jsonb),
+    'extras',   coalesce(q.data->'customerExtras', '{}'::jsonb),
+    'biz',      coalesce(q.data->'biz', '{}'::jsonb)
+  );
+end $$;
+
+-- The one thing a customer may change, and only to these two values.
+create or replace function public.answer_quote(token text, answer text)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if answer not in ('approved','declined') then
+    raise exception 'answer must be approved or declined';
+  end if;
+
+  update public.quotes
+     set status      = answer,
+         answered_at = now(),
+         updated_at  = now()
+   where share_token = token
+     and status in ('sent','approved','declined');   -- never a draft or a request
+
+  if not found then raise exception 'that quote is not awaiting an answer'; end if;
+  return answer;
+end $$;
+
+revoke all on function public.quote_by_token(text) from public;
+revoke all on function public.answer_quote(text, text) from public;
+grant execute on function public.quote_by_token(text) to anon, authenticated;
+grant execute on function public.answer_quote(text, text) to anon, authenticated;
+
+-- ------------------------------------------------- customer asks for one ---
+-- A stranger may create a request and nothing else. They cannot choose the
+-- price, the status, or whose books it lands in — this function decides all
+-- three. What comes back is only the token for following their own request.
+create or replace function public.request_quote(payload jsonb)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_id    text := 'r' || left(replace(gen_random_uuid()::text, '-', ''), 16);
+  the_owner uuid;
+  recent    int;
+begin
+  select owner into the_owner from public.config where id;
+  if the_owner is null then raise exception 'no driver configured'; end if;
+
+  -- Cheap flood guard: a burst of requests in one minute is not a person.
+  select count(*) into recent
+    from public.quotes
+   where origin = 'customer' and created_at > now() - interval '1 minute';
+  if recent >= 5 then raise exception 'too many requests, try again shortly'; end if;
+
+  if coalesce(trim(payload->>'customer'), '') = '' then
+    raise exception 'a name is required';
+  end if;
+
+  insert into public.quotes (id, owner, origin, status, customer, contact,
+                             first_date, price, data)
+  values (new_id, the_owner, 'customer', 'requested',
+          left(trim(payload->>'customer'), 120),
+          left(coalesce(trim(payload->>'contact'), ''), 60),
+          nullif(payload->>'first_date','')::date,
+          -- the estimate the page showed them; you confirm or change it
+          coalesce((payload->>'estimate')::numeric, 0),
+          jsonb_strip_nulls(payload));
+
+  return (select share_token from public.quotes where id = new_id);
+end $$;
+
+revoke all on function public.request_quote(jsonb) from public;
+grant execute on function public.request_quote(jsonb) to anon, authenticated;
+
+-- --------------------------------------------------------------- touch ------
+create or replace function public.touch_updated_at()
+returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end $$;
+
+drop trigger if exists quotes_touch on public.quotes;
+create trigger quotes_touch before update on public.quotes
+  for each row execute function public.touch_updated_at();
