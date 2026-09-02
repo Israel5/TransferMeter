@@ -108,9 +108,15 @@ export function tripTotals(trip: Trip, s: Settings, learned: Record<string, numb
   const band = bandPrice(total, s);
   const price = trip.priceOverride != null ? trip.priceOverride : band.price;
 
+  // A reading off the car outranks the assumption it was quoted under.
+  const real = fuelUsed(trip.actual, total, s);
+  const costUsed = real ? real.cost : cost;
+
   return {
     legs, total, loaded, loadedMins, empty: Math.max(0, total - loaded),
-    fuelL, cost, mins, missing, band, price, keep: price - cost,
+    fuelL: real ? real.litres : fuelL,
+    estFuelL: fuelL, cost: costUsed, estCost: cost, real,
+    mins, missing, band, price, keep: price - costUsed,
   };
 }
 
@@ -118,11 +124,13 @@ export function grandTotals(trips: Trip[], s: Settings, learned: Record<string, 
   return trips.reduce(
     (acc, t) => {
       const x = tripTotals(t, s, learned);
-      acc.total += x.total; acc.cost += x.cost; acc.price += x.price;
+      acc.total += x.total; acc.cost += x.cost; acc.estCost += x.estCost;
+      acc.price += x.price;
       acc.mins += x.mins; acc.missing += x.missing;
+      if (x.real) acc.measured++;
       return acc;
     },
-    { total: 0, cost: 0, price: 0, mins: 0, missing: 0 },
+    { total: 0, cost: 0, estCost: 0, price: 0, mins: 0, missing: 0, measured: 0 },
   );
 }
 

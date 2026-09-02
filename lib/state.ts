@@ -82,6 +82,7 @@ export function snapshot(st: AppState, id?: string): Quote {
         totalKm: x.total, mins: x.mins, cost: x.cost, price: x.price,
         paxKm: x.loaded, paxMins: x.loadedMins,
         tip: 0, paid: false, override: t.priceOverride,
+        actual: t.actual,
       };
     }),
     pax: { ...st.pax }, gear: { ...st.gear }, bags: { ...st.bags },
@@ -151,6 +152,7 @@ export function loadQuote(st: AppState, id: string): AppState {
       stops: t.stops.map((s) => ({ ...s })),
       liveLegs: t.legKm ? t.legKm.map((km) => ({ km: Number(km) || 0, mins: NaN })) : null,
       priceOverride: t.price,          // pin the fare that was quoted
+      actual: t.actual,                // and the readings taken since
     })),
     active: 0,
     customer: q.customer || "", contact: q.contact || "", notes: q.notes || "",

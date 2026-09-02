@@ -8,19 +8,6 @@ export type Stop = {
 
 export type LegSource = "saved" | "google" | "est" | "none";
 
-export type Trip = {
-  label: "Outbound" | "Return";
-  date: string;            // YYYY-MM-DD
-  time: string;            // HH:MM
-  stops: Stop[];
-  liveLegs: { km: number; mins: number }[] | null;
-  priceOverride: number | null;
-  tip?: number;
-  paid?: boolean;
-};
-
-export type Counts = Record<string, number>;
-
 /** What a ride actually cost, read off the car after driving it.
  *
  *  Every field is optional and independent: fill in only what you measured and
@@ -31,6 +18,21 @@ export type Actual = {
   l100?: number;   // the trip computer's average, litres per 100 km
   price?: number;  // $/L from the fill-up that fuelled it
 };
+
+export type Trip = {
+  label: "Outbound" | "Return";
+  date: string;            // YYYY-MM-DD
+  time: string;            // HH:MM
+  stops: Stop[];
+  liveLegs: { km: number; mins: number }[] | null;
+  priceOverride: number | null;
+  tip?: number;
+  paid?: boolean;
+  /** Measured after driving it; see Actual. Absent means the estimate stands. */
+  actual?: Actual;
+};
+
+export type Counts = Record<string, number>;
 
 export type Settings = {
   homeName: string; homeLat: number; homeLng: number;

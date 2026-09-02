@@ -23,7 +23,7 @@ export function Meter({
       <div className="meter-strip">
         <div><div className="label">Distance</div>
           <div className="v">{t.total > 0 ? <>{fmt(t.total, 1)} <small>km</small></> : "—"}</div></div>
-        <div><div className="label">Fuel</div>
+        <div><div className="label">Fuel{t.real ? " · real" : ""}</div>
           <div className="v">{t.total > 0 ? <>{fmt(t.fuelL, 1)} <small>L</small></> : "—"}</div></div>
         <div><div className="label">Time</div>
           <div className="v">{t.total > 0 ? dur(t.mins) : "—"}</div></div>
@@ -67,8 +67,12 @@ export function Meter({
           <span className="n">{t.total > 0 ? `${fmt(t.loaded, 1)} km` : "—"}</span></div>
         <div className="brow"><span className="k">Empty legs</span>
           <span className="n">{t.total > 0 ? `${fmt(t.empty, 1)} km` : "—"}</span></div>
-        <div className="brow"><span className="k">Fuel cost</span>
+        <div className="brow"><span className="k">{t.real ? "Fuel cost · measured" : "Fuel cost"}</span>
           <span className="n">{t.total > 0 ? `−${money(t.cost)}` : "—"}</span></div>
+        {t.real && Math.abs(t.cost - t.estCost) >= 0.005 && (
+          <div className="brow sub"><span className="k">estimated</span>
+            <span className="n">−{money(t.estCost)}</span></div>
+        )}
         <div className={"brow keep" + (hasRoute && t.keep < t.cost ? " thin" : "")}>
           <span className="k">You keep</span>
           <span className="n">{hasRoute ? money(t.keep) : "—"}</span></div>
@@ -80,7 +84,7 @@ export function Meter({
         {g && (<>
           <div className="label">Both legs together</div>
           <div className="brow"><span className="k">Distance</span><span className="n">{fmt(g.total, 1)} km</span></div>
-          <div className="brow"><span className="k">Fuel cost</span><span className="n">−{money(g.cost)}</span></div>
+          <div className="brow"><span className="k">{g.measured > 0 ? `Fuel cost · ${g.measured === trips.length ? "measured" : `${g.measured} of ${trips.length} measured`}` : "Fuel cost"}</span><span className="n">−{money(g.cost)}</span></div>
           <div className="brow"><span className="k">You keep</span><span className="n">{money(g.price - g.cost)}</span></div>
           <div className="brow grand"><span className="k">Total charge</span><span className="n">${fmt(g.price, 0)}</span></div>
         </>)}

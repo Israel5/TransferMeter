@@ -451,6 +451,8 @@ a.link:hover{text-decoration:underline}
   .fuel-box input{width:2.9rem}
 }
 /* What the job came to, once the legs above are settled. */
+/* A quieter second line under a figure it corrects. */
+.breakdown .brow.sub .k,.breakdown .brow.sub .n{color:var(--muted);font-size:.78rem}
 .qtotals{
   display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
   padding:8px 10px;border-top:1px solid var(--line);margin-top:2px;
