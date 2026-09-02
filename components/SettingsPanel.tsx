@@ -66,8 +66,9 @@ export function SettingsPanel({
           {num("homeLng", "Longitude")}
         </div>
         <p className="note">
-          Never shown on screen or to a customer — the route says “Starting point”. It is sent
-          to Google so distances are accurate.
+          Yours to see while you work. Customers never get it: their copy and the PDF say
+          “Starting point” and “End point” with the distance beside them. It is sent to
+          Google so distances are accurate.
         </p>
 
         <div className="subhead label">Car &amp; fuel</div>

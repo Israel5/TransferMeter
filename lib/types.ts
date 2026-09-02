@@ -74,6 +74,8 @@ export type Quote = {
   totalKm: number; cost: number; price: number; mins: number; keep: number;
   /** Addresses this quote for a customer. Lives on the row, not in the data. */
   shareToken?: string;
+  /** Set by the database when a customer corrects their own counts. */
+  customerEditedAt?: string;
 };
 
 export type Lang = "pt" | "en" | "fr";

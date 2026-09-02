@@ -66,6 +66,10 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
       ...(countList(q.gear ?? {}, GEAR_KEYS, W as any) ? { gear: countList(q.gear ?? {}, GEAR_KEYS, W as any) } : {}),
       ...(countList(q.bags ?? {}, BAG_KEYS, W as any) ? { bags: countList(q.bags ?? {}, BAG_KEYS, W as any) } : {}),
     },
+    // The same counts unrendered, so the customer's page can offer to correct
+    // them rather than only display a sentence built here.
+    xc: { pax: { ...(q.pax ?? {}) }, gear: { ...(q.gear ?? {}) }, bags: { ...(q.bags ?? {}) } },
+    seats: s.seats ?? 7,
     tot: (q.trips ?? []).reduce((n, t) => n + (t.price ?? 0), 0),
   };
 }

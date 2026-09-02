@@ -27,6 +27,17 @@ export function getClient() {
  *  Deliberately not a magic link: that would email the driver from Supabase,
  *  with Supabase's branding, to sign in to their own application. Nothing
  *  about the login should reveal, or depend on, who hosts the database. */
+/** A customer correcting their own passenger and luggage counts. The database
+ *  decides whether the quote is still open to it; this only carries the ask. */
+export async function updateQuoteCounts(
+  sb: SupabaseClient, token: string,
+  counts: { pax?: Record<string, number>; gear?: Record<string, number>; bags?: Record<string, number> },
+) {
+  const { data, error } = await sb.rpc("update_quote_counts", { token, counts });
+  if (error) throw error;
+  return data as { xc?: Record<string, Record<string, number>> };
+}
+
 export async function signIn(sb: SupabaseClient, email: string, password: string) {
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) {

@@ -179,6 +179,10 @@ export function TripList({
                       }
                     }}
                   >{STATUS_LABEL[st]}</span>
+                  {q.customerEditedAt && (
+                    <span className="qedited" title={`The customer changed their details on ${
+                      new Date(q.customerEditedAt).toLocaleString("en-CA")}`}>changed</span>
+                  )}
                   <span className="qchev">▾</span>
                 </button>
 

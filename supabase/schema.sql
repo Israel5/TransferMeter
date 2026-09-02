@@ -239,3 +239,90 @@ revoke all on function public.quote_by_token(text) from public;
 revoke all on function public.answer_quote(text, text) from public;
 grant execute on function public.quote_by_token(text) to anon, authenticated;
 grant execute on function public.answer_quote(text, text) to anon, authenticated;
+
+
+-- ---------------------------------------------------------------------------
+-- A customer correcting their own details.
+--
+-- They know how many of them there are and what they are carrying better than
+-- the driver guessing on the phone, so the link lets them fix it. Deliberately
+-- narrow: counts only, on a quote that is still awaiting an answer, and every
+-- key and value checked here rather than trusted from the browser. Nothing
+-- about price, dates, addresses or status can be reached through it.
+-- ---------------------------------------------------------------------------
+create or replace function public.update_quote_counts(token text, counts jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  q      public.quotes%rowtype;
+  clean  jsonb := '{}'::jsonb;
+  grp    text;
+  key    text;
+  val    numeric;
+  allowed constant jsonb := jsonb_build_object(
+    'pax',  jsonb_build_array('adults','children','infants'),
+    'gear', jsonb_build_array('infantSeat','carSeat','booster'),
+    'bags', jsonb_build_array('checked','carry','backpack','stroller','crib','other')
+  );
+begin
+  if jsonb_typeof(counts) is distinct from 'object' then
+    raise exception 'counts must be an object';
+  end if;
+
+  -- Keep only keys this function recognises, as whole numbers within reach of
+  -- a car. Anything else is dropped rather than argued with.
+  for grp in select jsonb_object_keys(allowed) loop
+    if counts ? grp then
+      if jsonb_typeof(counts -> grp) is distinct from 'object' then
+        raise exception '% must be an object', grp;
+      end if;
+      -- jsonb_set only ever creates the final key, so the group object has to
+      -- exist before a value can be written inside it. Without this the writes
+      -- vanish and the update looks like it worked.
+      if not (clean ? grp) then
+        clean := clean || jsonb_build_object(grp, '{}'::jsonb);
+      end if;
+      for key in select jsonb_array_elements_text(allowed -> grp) loop
+        if (counts -> grp) ? key then
+          begin
+            val := (counts -> grp ->> key)::numeric;
+          exception when others then
+            raise exception 'bad value for %.%', grp, key;
+          end;
+          if val < 0 or val > 20 or val <> floor(val) then
+            raise exception 'bad value for %.%', grp, key;
+          end if;
+          clean := jsonb_set(clean, array[grp, key], to_jsonb(floor(val)::int), true);
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  update public.quotes
+     set data = data
+              || jsonb_build_object(
+                   'pax',  coalesce(nullif(clean -> 'pax',  '{}'::jsonb), data -> 'pax'),
+                   'gear', coalesce(nullif(clean -> 'gear', '{}'::jsonb), data -> 'gear'),
+                   'bags', coalesce(nullif(clean -> 'bags', '{}'::jsonb), data -> 'bags'),
+                   'customerEditedAt', to_jsonb(now())
+                 ),
+         -- The customer's copy has to agree with what they just typed.
+         customer_view = coalesce(customer_view, '{}'::jsonb)
+              || jsonb_build_object('xc', coalesce(customer_view -> 'xc', '{}'::jsonb) || clean),
+         updated_at = now()
+   where share_token = token
+     and status = 'sent'          -- only while it is still awaiting an answer
+  returning * into q;
+
+  if not found then
+    raise exception 'that quote is not open for changes';
+  end if;
+
+  return jsonb_build_object('xc', q.customer_view -> 'xc');
+end $$;
+
+revoke all on function public.update_quote_counts(text, jsonb) from public;
+grant execute on function public.update_quote_counts(text, jsonb) to anon, authenticated;

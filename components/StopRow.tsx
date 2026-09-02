@@ -7,7 +7,8 @@ import type { Stop } from "@/lib/types";
 
 type Suggestion = { text: string; placeId?: string };
 
-/** Your base is shown by its role. The address stays in settings, never on screen. */
+/** The role your own address plays in this route. You see the street itself —
+ *  this is your screen. It is the customer's copy that gets the role instead. */
 function baseLabel(i: number, total: number) {
   if (i === 0) return "Starting point";
   if (i === total - 1) return "End point";
@@ -68,10 +69,12 @@ export function StopRow({
             className={"loc" + (stop.base ? " base-field" : "")}
             autoComplete="off"
             readOnly={!!stop.base}
-            title={stop.base ? "Your saved address — change it in settings" : undefined}
+            title={stop.base
+              ? `Your saved address — change it in settings. Customers see “${label}”.`
+              : undefined}
             aria-label={stop.base ? `${label} (your saved address)` : `Stop ${index + 1}`}
             placeholder={stop.base ? undefined : "Neighbourhood, full address, or 45.49, -73.65"}
-            value={stop.base ? label : stop.name}
+            value={stop.base ? (stop.name || label) : stop.name}
             onChange={(e) => { if (!stop.base) { onChange(e.target.value); search(e.target.value); } }}
             onBlur={() => setTimeout(() => setOpen(false), 120)}
             onKeyDown={(e) => {
@@ -95,6 +98,7 @@ export function StopRow({
               </button>
             ))}
           </div>
+          {stop.base && <span className="base-alias">customer sees “{label}”</span>}
         </span>
 
         <span className="stop-tools">
