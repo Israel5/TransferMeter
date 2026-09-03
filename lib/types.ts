@@ -20,6 +20,9 @@ export type Actual = {
 };
 
 export type Trip = {
+  /** Follows this leg through an edit. Without it a leg is only ever "the
+   *  second one", and deleting the first moves someone's payment onto it. */
+  legId?: string;
   label: "Outbound" | "Return";
   date: string;            // YYYY-MM-DD
   time: string;            // HH:MM
@@ -57,6 +60,9 @@ export type Settings = {
 export type QuoteStatus = "draft" | "requested" | "sent" | "approved" | "declined";
 
 export type SavedTrip = {
+  /** See Trip.legId. Absent on legs saved before it existed; matched by
+   *  position then, which is what it replaces. */
+  legId?: string;
   label: Trip["label"];
   date: string; time: string;
   stops: Stop[];

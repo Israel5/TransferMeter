@@ -48,6 +48,10 @@ export function initialState(): AppState {
 
 /** The quote as the driver has written it. No id, no number, no status: those
  *  belong to the database, and a snapshot is only ever the content. */
+/** A leg's own name, minted once and kept for as long as the leg exists. */
+export const newLegId = () =>
+  "l" + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+
 export function snapshot(st: AppState): QuoteContent {
   const g = grandTotals(st.trips, st.settings, st.learned);
   return {
@@ -59,6 +63,7 @@ export function snapshot(st: AppState): QuoteContent {
     trips: st.trips.map((t): SavedTrip => {
       const x = tripTotals(t, st.settings, st.learned);
       return {
+        legId: t.legId ?? newLegId(),
         label: t.label, date: t.date, time: t.time || "",
         stops: t.stops.map((s) => ({ name: s.name, base: !!s.base, placeId: s.placeId, lat: s.lat, lng: s.lng })),
         legKm: x.legs.map((l) => l.km),
@@ -95,12 +100,25 @@ export function saveQuote(st: AppState): SaveResult {
   const content = snapshot(st);
   if (editing) {
     // Tips, payments and fuel readings record what happened; a revised price
-    // must not erase them.
+    // must not erase them, and they must not move to another leg.
+    //
+    // Matched by the leg's own id. It used to be matched by position, so
+    // deleting the outbound half of a round trip handed its payment and its
+    // fuel reading to the return -- silently, and about money.
+    //
+    // A quote saved before legs had ids has none to match on, and the fresh
+    // ids minted above would match nothing at all -- which would lose the very
+    // payments this is here to keep. Those fall back to position, which is how
+    // they were saved; from the next save onwards they have ids.
+    const stored = editing.trips ?? [];
+    const storedHasIds = stored.some((t) => t.legId);
+    const byId = new Map(stored.filter((t) => t.legId).map((t) => [t.legId as string, t]));
     content.trips.forEach((t, n) => {
-      const p = editing.trips?.[n];
-      if (p?.tip) t.tip = p.tip;
-      if (p?.paid) t.paid = true;
-      if (p?.actual) t.actual = { ...p.actual };
+      const p = storedHasIds ? (t.legId ? byId.get(t.legId) : undefined) : stored[n];
+      if (!p) return;
+      if (p.tip) t.tip = p.tip;
+      if (p.paid) t.paid = true;
+      if (p.actual) t.actual = { ...p.actual };
     });
   }
 
@@ -121,6 +139,7 @@ export function loadQuote(st: AppState, id: number): AppState {
   return {
     ...st,
     trips: q.trips.map((t) => ({
+      legId: t.legId,
       label: t.label, date: t.date || "", time: t.time || "",
       stops: t.stops.map((s) => ({ ...s })),
       liveLegs: t.legKm ? t.legKm.map((km) => ({ km: Number(km) || 0, mins: NaN })) : null,

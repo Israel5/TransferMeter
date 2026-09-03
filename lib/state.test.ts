@@ -27,6 +27,7 @@ const editing = (q: Quote): AppState => ({
   customer: q.customer, contact: q.contact, notes: q.notes, lang: q.lang,
   pax: q.pax, gear: q.gear, bags: q.bags,
   trips: q.trips.map((t) => ({
+    legId: t.legId,
     label: t.label, date: t.date, time: t.time, stops: t.stops,
     liveLegs: null, priceOverride: t.price,
   })),
@@ -113,5 +114,58 @@ describe("opening and folding back", () => {
     expect(next.quotes).toHaveLength(1);
     expect(next.editingId).toBe(10);
     expect(hasUnsavedChanges(next)).toBe(false);
+  });
+});
+
+describe("payments follow their own leg, not a position", () => {
+  const round = (): Quote => {
+    const q = saved();
+    q.trips = [
+      { ...q.trips[0], legId: "out", label: "Outbound", date: "2026-09-03", price: 50, tip: 5, paid: false },
+      { ...q.trips[0], legId: "ret", label: "Return", date: "2026-09-10", price: 50, tip: 0, paid: true,
+        actual: { km: 42.4, l100: 13.2, price: 1.879 } },
+    ];
+    return q;
+  };
+
+  it("keeps the return's payment on the return when the outbound is deleted", () => {
+    const q = round();
+    const st = editing(q);
+    // Drop the outbound, as "Remove this leg" does.
+    const after = saveQuote({ ...st, trips: [st.trips[1]] });
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+
+    expect(after.content.trips).toHaveLength(1);
+    const kept = after.content.trips[0];
+    expect(kept.legId).toBe("ret");
+    expect(kept.paid).toBe(true);                       // the return was paid
+    expect(kept.tip).toBe(0);                           // and had no tip
+    expect(kept.actual).toEqual({ km: 42.4, l100: 13.2, price: 1.879 });
+  });
+
+  it("keeps them in place when the legs are reordered", () => {
+    const q = round();
+    const st = editing(q);
+    const after = saveQuote({ ...st, trips: [st.trips[1], st.trips[0]] });
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+
+    const [first, second] = after.content.trips;
+    expect(first.legId).toBe("ret");
+    expect(first.paid).toBe(true);
+    expect(second.legId).toBe("out");
+    expect(second.tip).toBe(5);
+    expect(second.paid).toBe(false);
+  });
+
+  it("still matches by position for legs saved before ids existed", () => {
+    const q = saved();
+    q.trips[0].tip = 7;
+    delete (q.trips[0] as { legId?: string }).legId;
+    const st = editing(q);
+    delete (st.trips[0] as { legId?: string }).legId;
+    const after = saveQuote(st);
+    expect(after.ok && after.content.trips[0].tip).toBe(7);
   });
 });
