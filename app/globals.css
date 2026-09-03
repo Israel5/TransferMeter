@@ -168,7 +168,23 @@ header.top{
 .tier[aria-pressed="true"]{
   background:var(--meter-digit);border-color:var(--meter-digit);color:#1a1206;font-weight:600;
 }
-.tier.custom{min-width:72px}
+/* The price you type is not one more band button. With three bands it could
+   sit at the end of the row; with eight it disappeared into them. */
+.ownprice{
+  display:flex;align-items:center;gap:10px;
+  padding:0 12px 12px;
+}
+.ownprice .label{
+  flex:1;font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
+  letter-spacing:.08em;font-size:.68rem;font-weight:600;color:var(--meter-muted);
+}
+.ownprice-clear{
+  border:0;background:none;padding:0;cursor:pointer;font:inherit;font-size:.74rem;
+  color:var(--meter-muted);text-decoration:underline;text-underline-offset:3px;
+}
+.ownprice-clear:hover{color:var(--meter-digit)}
+.tiers{padding-bottom:8px}
+.tier.custom{min-width:78px}
 .tier.custom.on{background:var(--meter-digit);border-color:var(--meter-digit);color:#1a1206;font-weight:600}
 .tier input{
   width:100%;background:transparent;border:0;color:inherit;font:inherit;text-align:center;padding:0;

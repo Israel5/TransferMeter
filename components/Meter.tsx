@@ -58,6 +58,10 @@ export function Meter({
             </button>
           );
         })}
+      </div>
+
+      <div className="ownprice">
+        <span className="label">Your own price</span>
         <span className={"tier custom" + (isCustom || typed ? " on" : "")}>
           <input type="number" min="0" step="1" inputMode="decimal" placeholder="other"
                  aria-label="Your own price"
@@ -75,6 +79,12 @@ export function Meter({
                    setTyped(null);
                  }} />
         </span>
+        {isCustom && (
+          <button type="button" className="ownprice-clear"
+                  onClick={() => { setTyped(null); onPrice(null); }}>
+            use the band
+          </button>
+        )}
       </div>
 
       <div className="breakdown">
