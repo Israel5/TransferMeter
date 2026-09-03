@@ -57,7 +57,7 @@ export function MessageEditor({
 
   const preview = useMemo(() => renderTemplate(
     text,
-    varsFor(sample, (sample.trips ?? [])[0], "https://…/quote#t=abc123", settings, lang,
+    varsFor(sample, (sample.trips ?? [])[0], "https://…/quote/1541ac65c01040f98d0b27bd", settings, lang,
             { when: kind === "onway" ? "today" : "tomorrow" }),
   ), [text, sample, settings, lang, kind]);
 
