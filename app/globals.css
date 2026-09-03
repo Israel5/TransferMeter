@@ -1151,41 +1151,54 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .rq-switch button[aria-pressed="true"]{
   color:var(--accent);text-decoration-color:var(--accent);
 }
-.rq-field input{
-  border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;
-  background:var(--surface);color:var(--ink);font:inherit;font-size:.95rem;width:100%;
+/* One shape for every control on this form.
+   The phone box, the username box and a plain input each used to carry their
+   own padding -- 8px, 9px, 10px -- so no two fields beside each other were the
+   same height. The measurements live here once. */
+.rq-field > input,
+.rq-field .PhoneInput,
+.rq-handle{
+  box-sizing:border-box;
+  width:100%;
+  min-height:44px;
+  border:1px solid var(--line-2);
+  border-radius:9px;
+  background:var(--surface);
+  padding:0 11px;
+  font-size:.95rem;
 }
-.rq-field input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+.rq-field > input{color:var(--ink);font-family:inherit}
+.rq-field > input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+
 .rq-check{display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:.9rem}
 .rq-check input{width:18px;height:18px;accent-color:var(--accent)}
 .rq-check + .rq-fields{margin-top:12px}
 .rq-note{
-  width:100%;border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;
+  box-sizing:border-box;width:100%;
+  border:1px solid var(--line-2);border-radius:9px;padding:11px;
   background:var(--surface);color:var(--ink);font:inherit;font-size:.95rem;resize:vertical;
 }
 .rq-note:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
-/* Phone or username, and the country picker that comes with the first. The
-   library ships plain controls; these make them match the rest of the form. */
-.rq-field .PhoneInput{
-  display:flex;align-items:center;gap:8px;
-  border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;background:var(--surface);
-}
+
+/* The library ships plain controls; these make them match everything else. */
+.rq-field .PhoneInput{display:flex;align-items:center;gap:8px}
 .rq-field .PhoneInput--focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
 .rq-field .PhoneInputInput{
   border:0;background:transparent;color:var(--ink);font:inherit;font-size:.95rem;
-  min-width:0;flex:1;
+  min-width:0;flex:1;padding:0;height:100%;
 }
 .rq-field .PhoneInputInput:focus{outline:none}
-.rq-field .PhoneInputCountry{gap:5px}
+.rq-field .PhoneInputCountry{gap:5px;margin:0}
 .rq-field .PhoneInputCountrySelect{color:var(--ink)}
 .rq-field .PhoneInputCountryIcon{width:1.5em;height:1.05em}
-.rq-handle{
-  display:flex;align-items:center;gap:2px;
-  border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;background:var(--surface);
-}
+
+.rq-handle{display:flex;align-items:center;gap:2px}
 .rq-handle:focus-within{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
 .rq-handle > span{color:var(--muted);font-size:.95rem}
-.rq-handle input{border:0;background:transparent;color:var(--ink);font:inherit;font-size:.95rem;flex:1;min-width:0}
+.rq-handle input{
+  border:0;background:transparent;color:var(--ink);font:inherit;font-size:.95rem;
+  flex:1;min-width:0;padding:0;height:100%;
+}
 .rq-handle input:focus{outline:none}
 .rq-turnstile{margin-bottom:14px;min-height:65px}
 .rq-send{width:100%;padding:15px;font-size:1rem}
