@@ -747,6 +747,24 @@ a.link:hover{text-decoration:underline}
    quote being written, which put the things you set once a year beside the
    thing you do every day. */
 .settings{margin-top:18px}
+/* Settings is a handful of unrelated jobs; tabs keep the one you came for from
+   arriving with four others attached. */
+.set-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:-1px;position:relative;z-index:1}
+.set-tabs button{
+  border:1px solid var(--line);border-bottom-color:transparent;
+  background:var(--surface-2);color:var(--muted);
+  border-radius:10px 10px 0 0;padding:9px 15px;cursor:pointer;font:inherit;font-size:.88rem;
+}
+.set-tabs button:hover{color:var(--ink)}
+.set-tabs button[aria-selected="true"]{
+  background:var(--surface);color:var(--ink);font-weight:600;
+  border-color:var(--line);border-bottom-color:var(--surface);
+}
+.settings .settings-body{border-radius:0 12px 12px 12px}
+.settings-body > .subhead:first-child{margin-top:0}
+@media (max-width:520px){
+  .set-tabs button{flex:1;padding:9px 8px;font-size:.8rem;text-align:center}
+}
 .settings-body{
   background:var(--surface);border:1px solid var(--line);
   border-radius:12px;padding:16px;box-shadow:var(--shadow);

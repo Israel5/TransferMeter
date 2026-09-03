@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt, measuredAverage, toL100, toKmPerL } from "@/lib/quote";
+import { useState } from "react";
 import { MessageEditor } from "./MessageEditor";
 import type { Quote, Settings } from "@/lib/types";
 
@@ -12,6 +13,12 @@ const NUM: [keyof Settings, string, string][] = [
   ["leaveBuffer", "Leave early by", "Minutes of slack"],
   ["seats", "Seats in the car", "Journey = 7"],
 ];
+type TabKey = "you" | "car" | "prices" | "messages" | "data";
+const TABS: [TabKey, string][] = [
+  ["you", "You"], ["car", "Car & fuel"], ["prices", "Prices"],
+  ["messages", "Messages"], ["data", "Data"],
+];
+
 const BANDS: [keyof Settings, string][] = [
   ["t1max", "Band 1 up to (km)"], ["t1", "Band 1 price"],
   ["t2max", "Band 2 up to (km)"], ["t2", "Band 2 price"], ["t3", "Above that"],
@@ -25,6 +32,7 @@ export function SettingsPanel({
   onClearLearned: () => void;
   onSignOut: () => void;
 }) {
+  const [tab, setTab] = useState<TabKey>("you");
   // What the car has really been doing, from the rides you measured.
   const real = measuredAverage(quotes);
   const drift = real ? real.l100 - toL100(settings.kmPerL) : 0;
@@ -50,7 +58,15 @@ export function SettingsPanel({
 
   return (
     <section className="settings open">
+      <div className="set-tabs" role="tablist">
+        {TABS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key}
+                  onClick={() => setTab(key)}>{label}</button>
+        ))}
+      </div>
+
       <div className="settings-body">
+      {tab === "you" && (<>
         <div className="subhead label">Your details (shown on the PDF)</div>
         <div className="fields">
           {text("bizName", "Name or business")}
@@ -71,7 +87,9 @@ export function SettingsPanel({
           “Starting point” and “End point” with the distance beside them. It is sent to
           Google so distances are accurate.
         </p>
+      </>)}
 
+      {tab === "car" && (<>
         <div className="subhead label">Car &amp; fuel</div>
         <div className="fields">
           <div className="field">
@@ -109,13 +127,22 @@ export function SettingsPanel({
           </p>
         )}
 
+      </>)}
+
+      {tab === "prices" && (<>
         <div className="subhead label">Price bands</div>
         <div className="fields">{BANDS.map(([k, l]) => num(k, l))}</div>
+        <p className="note">
+          A trip is priced by its band unless you set your own price on the quote itself.
+        </p>
+      </>)}
 
-        <div className="subhead label">Messages to customers</div>
+      {tab === "messages" && (
         <MessageEditor settings={settings} quotes={quotes}
                        onChange={(templates) => onChange({ templates })} />
+      )}
 
+      {tab === "data" && (<>
         <div className="subhead label">Learned distances</div>
         <p className="note">
           {learnedCount === 0
@@ -134,6 +161,7 @@ export function SettingsPanel({
         <div className="route-actions" style={{ borderTop: 0, paddingTop: 4 }}>
           <button className="btn danger" type="button" onClick={onSignOut}>Sign out</button>
         </div>
+      </>)}
       </div>
     </section>
   );
