@@ -444,6 +444,14 @@ export default function Home() {
                            .catch(() => say("Those distances could not be forgotten — they will return on reload."));
                        }
                      }}
+                     onRestored={async () => {
+                       // Whatever is on screen is now older than the database.
+                       try {
+                         const remote = await pull();
+                         if (remote) setSt((prev) => ({ ...prev, ...remote } as AppState));
+                         setStore("Synced");
+                       } catch { setStore("Not saved"); }
+                     }}
                      onSignOut={async () => {
                        try { await signOut(); } catch { /* the cookie goes either way */ }
                        // A full reload, so nothing of the signed-in screen is

@@ -3,6 +3,7 @@
 import { fmt, measuredAverage, toL100, toKmPerL } from "@/lib/quote";
 import { useState } from "react";
 import { MessageEditor } from "./MessageEditor";
+import { BackupPanel } from "./BackupPanel";
 import type { Quote, Settings } from "@/lib/types";
 
 const NUM: [keyof Settings, string, string][] = [
@@ -25,12 +26,13 @@ const BANDS: [keyof Settings, string][] = [
 ];
 
 export function SettingsPanel({
-  settings, learnedCount, quotes, onChange, onClearLearned, onSignOut,
+  settings, learnedCount, quotes, onChange, onClearLearned, onSignOut, onRestored,
 }: {
   settings: Settings; learnedCount: number; quotes: Quote[];
   onChange: (patch: Partial<Settings>) => void;
   onClearLearned: () => void;
   onSignOut: () => void;
+  onRestored: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("you");
   // What the car has really been doing, from the rides you measured.
@@ -143,6 +145,9 @@ export function SettingsPanel({
       )}
 
       {tab === "data" && (<>
+        <div className="subhead label">Backup</div>
+        <BackupPanel onRestored={onRestored} />
+
         <div className="subhead label">Learned distances</div>
         <p className="note">
           {learnedCount === 0

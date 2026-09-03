@@ -189,3 +189,86 @@ export async function answerQuote(sb: SupabaseClient, token: string, answer: "ap
   if (error) throw new Error(error.message);
   return data as { status: string; answered_at: string };
 }
+
+/* ---------- taking a copy, and putting one back ---------- */
+
+export type Backup = {
+  app: "transfer-meter";
+  version: 1;
+  exportedAt: string;
+  quotes: { id: string; status: string; share_token: string; data: unknown; customer_view: unknown }[];
+  settings: { data: unknown; draft: unknown } | null;
+  learned: { pair: string; km: number }[];
+};
+
+/** Everything, exactly as stored -- including each quote's share token, so a
+ *  restored quote keeps the link already sent to its customer. */
+export async function exportAll(sb: SupabaseClient): Promise<Backup> {
+  const [{ data: quotes, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
+    sb.from("quotes").select("id,status,share_token,data,customer_view").order("seq"),
+    sb.from("settings").select("data,draft").limit(1).maybeSingle(),
+    sb.from("learned").select("pair,km"),
+  ]);
+  if (e1) throw new Error(e1.message);
+  return {
+    app: "transfer-meter",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    quotes: (quotes ?? []) as Backup["quotes"],
+    settings: (cfg ?? null) as Backup["settings"],
+    learned: (lrn ?? []) as Backup["learned"],
+  };
+}
+
+/** Put a backup back.
+ *
+ *  Adds and overwrites; never deletes. A quote in the database and not in the
+ *  file is left alone, because the likeliest reason to restore is that
+ *  something went missing, and the likeliest way to make that worse is to
+ *  remove whatever survived.
+ *
+ *  The owner in the file is ignored: rows are written to whoever is signed in,
+ *  so a backup can be restored into a different account and cannot be used to
+ *  write into somebody else's. */
+export async function importAll(sb: SupabaseClient, owner: string, backup: Backup) {
+  if (backup?.app !== "transfer-meter") throw new Error("That is not a Transfer Meter backup.");
+  if (backup.version !== 1) throw new Error(`That backup is version ${backup.version}; this app reads version 1.`);
+
+  let quotes = 0, learned = 0;
+  if (Array.isArray(backup.quotes) && backup.quotes.length) {
+    const rows = backup.quotes
+      .filter((q) => q && typeof q.id === "string" && q.data)
+      .map((q) => ({
+        id: q.id, owner,
+        status: typeof q.status === "string" ? q.status : "draft",
+        ...(typeof q.share_token === "string" && q.share_token ? { share_token: q.share_token } : {}),
+        data: q.data,
+        customer_view: q.customer_view ?? null,
+      }));
+    if (rows.length) {
+      const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+      quotes = rows.length;
+    }
+  }
+
+  if (backup.settings?.data) {
+    const { error } = await sb.from("settings").upsert(
+      { owner, data: backup.settings.data, draft: backup.settings.draft ?? {} },
+      { onConflict: "owner" });
+    if (error) throw new Error(error.message);
+  }
+
+  if (Array.isArray(backup.learned) && backup.learned.length) {
+    const rows = backup.learned
+      .filter((l) => l && typeof l.pair === "string" && Number.isFinite(Number(l.km)))
+      .map((l) => ({ owner, pair: l.pair, km: Number(l.km) }));
+    if (rows.length) {
+      const { error } = await sb.from("learned").upsert(rows, { onConflict: "owner,pair" });
+      if (error) throw new Error(error.message);
+      learned = rows.length;
+    }
+  }
+
+  return { quotes, learned, settings: !!backup.settings?.data };
+}

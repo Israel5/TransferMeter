@@ -75,6 +75,20 @@ export async function clearLearned() {
   await call("/api/learned", { method: "DELETE" });
 }
 
+/* ---------- keeping a copy ---------- */
+
+export async function fetchBackup(): Promise<unknown> {
+  const r = await fetch("/api/backup");
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.error || "Could not make a backup.");
+  return r.json();
+}
+
+export async function restoreBackup(backup: unknown) {
+  return call<{ quotes: number; learned: number; settings: boolean }>("/api/backup", {
+    method: "POST", body: JSON.stringify(backup),
+  });
+}
+
 /* ---------- what a customer's link opens ---------- */
 
 export async function fetchQuoteByToken(token: string) {

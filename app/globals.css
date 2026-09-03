@@ -749,6 +749,14 @@ a.link:hover{text-decoration:underline}
 .settings{margin-top:18px}
 /* Settings is a handful of unrelated jobs; tabs keep the one you came for from
    arriving with four others attached. */
+.backup{display:grid;gap:4px}
+.backup-peek{
+  border:1px solid color-mix(in srgb,var(--amber) 45%,transparent);
+  background:color-mix(in srgb,var(--amber) 8%,transparent);
+  border-radius:10px;padding:12px 14px;margin-top:10px;
+}
+.backup-peek > p:first-child{margin:0 0 6px;font-size:.92rem}
+.note.good{color:var(--good)}
 .set-tabs{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:-1px;position:relative;z-index:1}
 .set-tabs button{
   border:1px solid var(--line);border-bottom-color:transparent;
