@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@/components/Editor";
 import { TripList } from "@/components/TripList";
 import { Calendar } from "@/components/Calendar";
+import { Dashboard, type Run } from "@/components/Dashboard";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import {
   initialState, loadQuote, newQuote, saveQuote, dedupeQuotes,
@@ -15,12 +16,13 @@ import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
+import { reminderMessage } from "@/lib/reminders";
 import { currentSession, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
-import type { Quote, Settings, Stop, Trip } from "@/lib/types";
+import type { Lang, Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
   const [st, setSt] = useState<AppState>(initialState);
-  const [view, setView] = useState<"list" | "quote" | "calendar" | "settings">("list");
+  const [view, setView] = useState<"today" | "list" | "quote" | "calendar" | "settings">("list");
   const [signedIn, setSignedIn] = useState(false);
   const [booted, setBooted] = useState(false);
   const live = true;   // the Maps proxy is always there
@@ -290,6 +292,29 @@ export default function Home() {
     await act(r.quote);
   };
 
+  const remind = async (r: Run, kind: "before" | "onway", lang: Lang) => {
+    const q = await linkable(r.quote);
+    if (!q) return;
+    const { link, isPrivate } = customerLinkFor(q);
+    if (isPrivate) {
+      say("This address only works on your own network — send from the deployed site.");
+      return;
+    }
+
+    const body = reminderMessage(kind, q, r.trip, link, st.settings, lang);
+    const wa = waLink(q.contact, body, st.settings);
+    if (wa) window.open(wa, "_blank", "noopener");
+    else {
+      try { await navigator.clipboard.writeText(body); say("No WhatsApp for them — message copied instead."); }
+      catch { window.prompt("Copy this message:", body); }
+    }
+
+    const stamp = new Date().toISOString();
+    const trips = (q.trips ?? []).map((t, i) =>
+      i === r.legIndex ? { ...t, [kind === "before" ? "remindedAt" : "onWayAt"]: stamp } : t);
+    patchQuote(q.id, { trips });
+  };
+
   const sendQuote = async (qIn: Quote) => {
     const q = await linkable(qIn);
     if (!q) return;
@@ -357,6 +382,8 @@ export default function Home() {
         <p className="tagline">Route, fuel and fare</p>
         <span className="top-spacer" />
         <div className="viewswitch">
+          <button type="button" aria-pressed={view === "today"}
+                  onClick={() => setView("today")}>Today</button>
           <button type="button" aria-pressed={view === "list" || view === "quote"}
                   onClick={() => setView("list")}>Trips</button>
           <button type="button" aria-pressed={view === "calendar"}
@@ -387,6 +414,12 @@ export default function Home() {
                 onNewQuote={() => { const next = newQuote(st); setSt(next); persist(next); }}
                 onBack={() => setView("list")}
                 flash={flash} />
+      )}
+
+      {view === "today" && (
+        <Dashboard quotes={st.quotes} settings={st.settings} learned={st.learned}
+                   onRemind={remind}
+                   onOpen={(id) => { const next = loadQuote(st, id); setSt(next); persist(next); setView("quote"); }} />
       )}
 
       {view === "calendar" && <Calendar quotes={st.quotes} settings={st.settings} onPatch={patchQuote} />}

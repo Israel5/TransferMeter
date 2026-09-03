@@ -57,6 +57,10 @@ export type SavedTrip = {
   override: number | null;
   /** Measured after driving it. Absent means the estimate above still stands. */
   actual?: Actual;
+  /** When the day-before reminder and the on-my-way message were sent, so the
+   *  dashboard is a list of what is left to do rather than what exists. */
+  remindedAt?: string;
+  onWayAt?: string;
 };
 
 export type Quote = {
