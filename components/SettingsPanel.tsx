@@ -4,6 +4,7 @@ import { fmt, measuredAverage, toL100, toKmPerL } from "@/lib/quote";
 import { useState } from "react";
 import { MessageEditor } from "./MessageEditor";
 import { BackupPanel } from "./BackupPanel";
+import { BandEditor } from "./BandEditor";
 import type { Quote, Settings } from "@/lib/types";
 
 const NUM: [keyof Settings, string, string][] = [
@@ -20,10 +21,6 @@ const TABS: [TabKey, string][] = [
   ["messages", "Messages"], ["data", "Data"],
 ];
 
-const BANDS: [keyof Settings, string][] = [
-  ["t1max", "Band 1 up to (km)"], ["t1", "Band 1 price"],
-  ["t2max", "Band 2 up to (km)"], ["t2", "Band 2 price"], ["t3", "Above that"],
-];
 
 export function SettingsPanel({
   settings, learnedCount, quotes, onChange, onClearLearned, onSignOut, onRestored,
@@ -140,10 +137,8 @@ export function SettingsPanel({
 
       {tab === "prices" && (<>
         <div className="subhead label">Price bands</div>
-        <div className="fields">{BANDS.map(([k, l]) => num(k, l))}</div>
-        <p className="note">
-          A trip is priced by its band unless you set your own price on the quote itself.
-        </p>
+        <BandEditor bands={settings.bands ?? []}
+                    onChange={(bands) => onChange({ bands })} />
       </>)}
 
       {tab === "messages" && (

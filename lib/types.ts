@@ -34,6 +34,10 @@ export type Trip = {
 
 export type Counts = Record<string, number>;
 
+/** One price band: everything up to `upTo` kilometres costs `price`. The last
+ *  band in the list has no upper limit. */
+export type Band = { upTo: number | null; price: number };
+
 export type Settings = {
   homeName: string; homeLat: number; homeLng: number;
   bizName: string; bizPhone: string; bizWhats: string;
@@ -41,7 +45,9 @@ export type Settings = {
   kmPerL: number; fuelPrice: number; roadFactor: number;
   avgSpeed: number; waitPerStop: number; seats: number; leaveBuffer: number;
   countryCode: string;
-  t1max: number; t1: number; t2max: number; t2: number; t3: number;
+  /** What you charge, by how far the trip is. Ordered, and the last one has no
+   *  upper limit -- it is what everything beyond the others costs. */
+  bands: Band[];
   /** Rewritten customer messages, by kind and language. Only what you have
    *  actually changed is stored; anything absent uses the built-in wording, so
    *  a better default still reaches you. */
@@ -120,7 +126,7 @@ export const DEFAULTS: Settings = {
   kmPerL: 5, fuelPrice: 2.0, roadFactor: 1.55,
   avgSpeed: 55, waitPerStop: 10, seats: 7, leaveBuffer: 10,
   countryCode: "1",
-  t1max: 45, t1: 50, t2max: 75, t2: 60, t3: 70,
+  bands: [{ upTo: 45, price: 50 }, { upTo: 75, price: 60 }, { upTo: null, price: 70 }],
 };
 
 export const PAX_KEYS: [string, string][] = [

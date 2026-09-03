@@ -1,6 +1,6 @@
 "use client";
 
-import { fmt, money, dur, grandTotals, tripTotals } from "@/lib/quote";
+import { fmt, money, dur, grandTotals, orderedBands, tripTotals } from "@/lib/quote";
 import type { Settings, Trip } from "@/lib/types";
 
 /** The fare readout, styled as an instrument: dark in both themes, amber digits. */
@@ -14,7 +14,7 @@ export function Meter({
   const t = tripTotals(trip, settings, learned);
   const hasRoute = t.total > 0 && t.missing === 0;
   const g = trips.length > 1 ? grandTotals(trips, settings, learned) : null;
-  const bands = [settings.t1, settings.t2, settings.t3];
+  const bands = orderedBands(settings).map((b) => b.price);
   const override = trip.priceOverride;
   const isCustom = override != null && !bands.includes(override);
 

@@ -1,5 +1,5 @@
 import { PLACE_BY_NAME } from "./places";
-import type { Actual, Counts, Quote, SavedTrip, Settings, Stop, Trip, Lang } from "./types";
+import type { Actual, Band, Counts, Quote, SavedTrip, Settings, Stop, Trip, Lang } from "./types";
 
 /* ---------- geography ---------- */
 
@@ -68,10 +68,36 @@ export function legMins(info: LegInfo, s: Settings) {
   return s.avgSpeed > 0 ? (info.km / s.avgSpeed) * 60 : 0;
 }
 
+/** The bands in the order they are read: shortest first, and the one with no
+ *  upper limit last however it was typed. A list a driver can add to is a list
+ *  a driver can put out of order. */
+export function orderedBands(s: Settings): Band[] {
+  const all = (s.bands ?? []).filter((b) => b && Number.isFinite(Number(b.price)));
+  const capped = all.filter((b) => Number(b.upTo) > 0).sort((a, b) => Number(a.upTo) - Number(b.upTo));
+  const open = all.find((b) => !(Number(b.upTo) > 0));
+  return open ? [...capped, open] : capped;
+}
+
 export function bandPrice(km: number, s: Settings) {
-  if (km <= s.t1max) return { price: s.t1, note: `up to ${s.t1max} km` };
-  if (km <= s.t2max) return { price: s.t2, note: `${s.t1max}–${s.t2max} km` };
-  return { price: s.t3, note: `over ${s.t2max} km` };
+  const bands = orderedBands(s);
+  if (!bands.length) return { price: 0, note: "no bands set" };
+
+  let from = 0;
+  for (const b of bands) {
+    if (!(Number(b.upTo) > 0)) break;
+    if (km <= Number(b.upTo)) {
+      return {
+        price: Number(b.price),
+        note: from > 0 ? `${from}–${b.upTo} km` : `up to ${b.upTo} km`,
+      };
+    }
+    from = Number(b.upTo);
+  }
+
+  const last = bands[bands.length - 1];
+  // Every band has a limit and the trip is past all of them: the longest one
+  // is the closest answer there is, and silently charging nothing is not.
+  return { price: Number(last.price), note: from > 0 ? `over ${from} km` : "any distance" };
 }
 
 export type Totals = ReturnType<typeof tripTotals>;
