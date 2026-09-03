@@ -18,6 +18,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     await setQuoteStatus(me.sb, id, status);
     return NextResponse.json({ ok: true });
   } catch (e) {
+    // The reason stays here where it can be read; the browser gets a sentence.
+    console.error("[api/quotes/[id]/status]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

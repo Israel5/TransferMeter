@@ -10,6 +10,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     return NextResponse.json({ token: await fetchShareToken(me.sb, id) });
   } catch (e) {
+    // The reason stays here where it can be read; the browser gets a sentence.
+    console.error("[api/quotes/[id]/token]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
@@ -22,6 +24,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   try {
     return NextResponse.json({ token: await rotateShareToken(me.sb, id) });
   } catch (e) {
+    // The reason stays here where it can be read; the browser gets a sentence.
+    console.error("[api/quotes/[id]/token]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

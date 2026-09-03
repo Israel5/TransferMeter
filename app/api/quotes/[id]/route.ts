@@ -12,6 +12,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     await removeQuote(me.sb, id);
     return NextResponse.json({ ok: true });
   } catch (e) {
+    // The reason stays here where it can be read; the browser gets a sentence.
+    console.error("[api/quotes/[id]]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

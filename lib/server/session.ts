@@ -33,6 +33,17 @@ export function anonClient(): SupabaseClient {
   return createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+/** The user id a token claims, unverified. See userClient for why that is
+ *  enough here -- the database verifies the token on every statement. */
+function subjectOf(jwt: string): string | null {
+  try {
+    const body = jwt.split(".")[1];
+    if (!body) return null;
+    const claims = JSON.parse(Buffer.from(body, "base64url").toString("utf8"));
+    return typeof claims?.sub === "string" ? claims.sub : null;
+  } catch { return null; }
+}
+
 export async function readSession(): Promise<Stored | null> {
   const raw = (await cookies()).get(COOKIE)?.value;
   if (!raw) return null;
@@ -72,9 +83,18 @@ export async function userClient(): Promise<{ sb: SupabaseClient; owner: string 
   // A minute of slack, so a token does not expire midway through a request.
   const fresh = stored.expires_at * 1000 > Date.now() + 60_000;
   if (fresh) {
-    const sb = build(stored.access_token);
-    const { data } = await sb.auth.getUser(stored.access_token);
-    if (data?.user) return { sb, owner: data.user.id };
+    // Deliberately not asking the auth server who this is. That was a network
+    // round-trip on every single request, and when two requests raced -- which
+    // React does on mount in development -- one could refresh while the other
+    // was still using the old token, and the loser surfaced as a 500 rather
+    // than a clean sign-in prompt.
+    //
+    // The claim is read without verifying it, which is safe because nothing
+    // trusts it: it is only used as the owner written on new rows, and the
+    // database checks that against the token itself. A forged one writes
+    // nothing, because row-level security refuses it.
+    const owner = subjectOf(stored.access_token);
+    if (owner) return { sb: build(stored.access_token), owner };
   }
 
   const plain = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });

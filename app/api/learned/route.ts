@@ -9,6 +9,8 @@ export async function DELETE() {
     await clearLearned(me.sb, me.owner);
     return NextResponse.json({ ok: true });
   } catch (e) {
+    // The reason stays here where it can be read; the browser gets a sentence.
+    console.error("[api/learned]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }

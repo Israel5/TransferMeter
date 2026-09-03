@@ -5,13 +5,18 @@ import { customerPayload } from "@/lib/message";
 import { waDigits } from "@/lib/whatsapp";
 import type { AppState } from "@/lib/state";
 
+/** A rejected or expired token reads as "sign in again", never as a fault. */
+const authish = (e: unknown) =>
+  /jwt|token|expired|unauthor/i.test((e as Error)?.message ?? "");
+
 export async function GET() {
   const me = await userClient();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
   try {
     return NextResponse.json(await pull(me.sb));
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    console.error("[api/data] GET", e);
+    return NextResponse.json({ error: (e as Error).message }, { status: authish(e) ? 401 : 500 });
   }
 }
 
@@ -30,6 +35,7 @@ export async function PUT(req: Request) {
       customerPayload(q, state.settings, (v: string) => waDigits(v, state.settings)));
     return NextResponse.json({ ok: true, adopted });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    console.error("[api/data] PUT", e);
+    return NextResponse.json({ error: (e as Error).message }, { status: authish(e) ? 401 : 500 });
   }
 }
