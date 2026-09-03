@@ -117,7 +117,7 @@ export type CustomerView = {
 export const DEFAULTS: Settings = {
   homeName: "", homeLat: 45.5019, homeLng: -73.5674,   // Montréal centre
   bizName: "", bizPhone: "", bizWhats: "", customerPage: "",
-  kmPerL: 5, fuelPrice: 2.0, roadFactor: 1.35,
+  kmPerL: 5, fuelPrice: 2.0, roadFactor: 1.55,
   avgSpeed: 55, waitPerStop: 10, seats: 7, leaveBuffer: 10,
   countryCode: "1",
   t1max: 45, t1: 50, t2max: 75, t2: 60, t3: 70,

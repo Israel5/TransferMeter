@@ -8,7 +8,7 @@ import type { Quote, Settings } from "@/lib/types";
 
 const NUM: [keyof Settings, string, string][] = [
   ["fuelPrice", "Fuel price / L", ""],
-  ["roadFactor", "Road factor", "Straight line → real roads"],
+  ["roadFactor", "Road factor", "Straight line → real roads. Montréal measures 1.55"],
   ["avgSpeed", "Avg speed km/h", ""],
   ["waitPerStop", "Min. per stop", "Loading bags, waiting"],
   ["leaveBuffer", "Leave early by", "Minutes of slack"],
