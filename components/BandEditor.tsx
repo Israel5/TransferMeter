@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt } from "@/lib/quote";
+import { DEFAULTS } from "@/lib/types";
 import type { Band } from "@/lib/types";
 
 /* What you charge, by how far.
@@ -16,9 +17,13 @@ export function BandEditor({
   bands: Band[];
   onChange: (bands: Band[]) => void;
 }) {
-  const capped = bands.filter((b) => Number(b.upTo) > 0)
+  // An empty list is a settings row that has not been repaired yet, not an
+  // instruction to charge nothing.
+  const usable = bands.filter((b) => b && Number(b.price) > 0);
+  const shown = usable.length ? usable : DEFAULTS.bands;
+  const capped = shown.filter((b) => Number(b.upTo) > 0)
     .sort((a, b) => Number(a.upTo) - Number(b.upTo));
-  const open = bands.find((b) => !(Number(b.upTo) > 0)) ?? { upTo: null, price: 0 };
+  const open = shown.find((b) => !(Number(b.upTo) > 0)) ?? { upTo: null, price: 0 };
   const rows = [...capped, open];
 
   const write = (next: Band[]) => onChange(next);

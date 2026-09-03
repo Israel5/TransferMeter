@@ -63,6 +63,36 @@ export async function updateQuote(
   return toQuote(data as Row);
 }
 
+/** Repair settings on the way in.
+ *
+ *  A browser holding an older shape will write it back over anything changed
+ *  underneath it, so a change to stored data alone does not stick. Mending it
+ *  here means it mends itself on the next load, whatever is in the row.
+ *
+ *  Bands were five numbered fields before they were a list. If the list is
+ *  missing or empty and those fields are there, they are the list. */
+function repair(data: Record<string, unknown>): Settings {
+  const s = { ...DEFAULTS, ...(data as Partial<Settings>) };
+  const bands = Array.isArray(s.bands) ? s.bands.filter((b) => b && Number(b.price) > 0) : [];
+
+  const legacy = data as Record<string, number | undefined>;
+  if (!bands.length && Number(legacy.t1) > 0) {
+    s.bands = [
+      ...(Number(legacy.t1max) > 0 ? [{ upTo: Number(legacy.t1max), price: Number(legacy.t1) }] : []),
+      ...(Number(legacy.t2max) > 0 ? [{ upTo: Number(legacy.t2max), price: Number(legacy.t2) }] : []),
+      { upTo: null, price: Number(legacy.t3) || Number(legacy.t2) || Number(legacy.t1) },
+    ];
+  } else if (!bands.length) {
+    s.bands = DEFAULTS.bands;
+  } else {
+    s.bands = bands;
+  }
+
+  // The fields the list replaced, so they cannot come back a third time.
+  for (const k of ["t1max", "t1", "t2max", "t2", "t3"]) delete (s as Record<string, unknown>)[k];
+  return s;
+}
+
 export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null> {
   const [{ data: rows, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
     sb.from("quotes").select(QUOTE_COLUMNS),
@@ -77,7 +107,7 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
   const draft = (cfg?.draft ?? {}) as Partial<AppState>;
   return {
     ...draft,
-    settings: { ...DEFAULTS, ...((cfg?.data ?? {}) as Settings) },
+    settings: repair((cfg?.data ?? {}) as Record<string, unknown>),
     learned,
     // The token lives on the row, not in the snapshot: it addresses the quote
     // for a customer and should not travel inside exported data.
