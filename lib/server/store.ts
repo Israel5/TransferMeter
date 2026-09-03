@@ -1,7 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppState } from "@/lib/state";
-import { dedupeQuotes } from "@/lib/state";
-import type { Quote, Settings } from "@/lib/types";
+import type { Quote, QuoteContent, Settings } from "@/lib/types";
 import { DEFAULTS } from "@/lib/types";
 
 /* Every read and write of the driver's data, run on the server.
@@ -12,36 +11,61 @@ import { DEFAULTS } from "@/lib/types";
  * script on the page can see it, and where no key has to ship to reach it.
  */
 
-function rowFrom(q: Quote, owner: string, customerView?: unknown) {
-  const dated = (q.trips ?? []).map((t) => t.date).filter(Boolean).sort();
-  // The status is deliberately absent, here and inside data. A save carries
-  // the content of a quote; the status is changed by an act -- the driver
-  // pressing the pill, or a customer answering -- and only those write it.
-  // Leaving it out of the bulk save is what makes it impossible to clobber:
-  // an omitted column keeps its stored value on update, and takes the table
-  // default of 'draft' on insert, which is what a new quote is anyway.
-  const { status: _drop, ...content } = q;
-  return {
-    id: q.id, owner,
-    quote_no: q.quoteNo || null,
-    customer: q.customer || null,
-    contact: q.contact || null,
-    notes: q.notes || null,
-    origin: q.origin ?? "driver",
-    first_date: dated[0] || null,
-    price: Number(q.price) || 0,
-    tip: (q.trips ?? []).reduce((n, t) => n + (Number(t.tip) || 0), 0),
-    cost: Number(q.cost) || 0,
-    total_km: Number(q.totalKm) || 0,
-    data: content,
-    // What the customer is allowed to see, decided here rather than in SQL.
-    ...(customerView ? { customer_view: customerView } : {}),
-  };
+/** The columns that make a stored quote out of its content. */
+const QUOTE_COLUMNS = "id,quote_no,status,share_token,data";
+
+type Row = {
+  id: number; quote_no: string | null; status: string | null;
+  share_token: string | null; data: QuoteContent & { savedAt?: string; customerEditedAt?: string };
+};
+
+const toQuote = (r: Row): Quote => ({
+  ...r.data,
+  id: r.id,
+  quoteNo: r.quote_no ?? "",
+  status: (r.status ?? "draft") as Quote["status"],
+  shareToken: r.share_token ?? undefined,
+  savedAt: r.data?.savedAt ?? "",
+});
+
+/** Create one. The database issues the id, and the number follows from it. */
+export async function createQuote(
+  sb: SupabaseClient, owner: string, content: QuoteContent, customerView?: unknown,
+): Promise<Quote> {
+  const { data, error } = await sb
+    .from("quotes")
+    .insert({
+      owner,
+      // Only what the quote says. There used to be a column mirroring each of
+      // customer, price, cost and the rest, written on every save and read by
+      // nothing; a second copy of a fact that already has a home is how the
+      // status came to disagree with itself twice.
+      data: { ...content, savedAt: new Date().toISOString() },
+      ...(customerView ? { customer_view: customerView } : {}),
+    })
+    .select(QUOTE_COLUMNS)
+    .single();
+  if (error) throw new Error(error.message);
+  return toQuote(data as Row);
+}
+
+/** Update one that already exists. */
+export async function updateQuote(
+  sb: SupabaseClient, id: number, content: QuoteContent, customerView?: unknown,
+): Promise<Quote> {
+  const { data, error } = await sb
+    .from("quotes")
+    .update({ data: content, ...(customerView ? { customer_view: customerView } : {}) })
+    .eq("id", id)
+    .select(QUOTE_COLUMNS)
+    .single();
+  if (error) throw new Error(error.message);
+  return toQuote(data as Row);
 }
 
 export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null> {
   const [{ data: rows, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
-    sb.from("quotes").select("data,status,share_token").order("seq", { ascending: false }),
+    sb.from("quotes").select(QUOTE_COLUMNS),
     sb.from("settings").select("data,draft").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
@@ -57,17 +81,12 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
     learned,
     // The token lives on the row, not in the snapshot: it addresses the quote
     // for a customer and should not travel inside exported data.
-    // Ordered by when each quote was first saved, not by the order the rows
-    // happen to sit in. A restore re-inserts rows and hands them fresh
-    // identity values, so insertion order stops meaning anything the moment
-    // one is used -- and the identity column is not worth resetting for a
-    // number nobody ever sees.
-    quotes: dedupeQuotes(
-      (rows ?? [])
-        .map((r: any) => (r.data ? { ...r.data, status: r.status ?? "draft", shareToken: r.share_token } : null))
-        .filter(Boolean)
-        .sort((a: Quote, b: Quote) => String(b.savedAt ?? "").localeCompare(String(a.savedAt ?? ""))) as Quote[],
-    ),
+    // Newest first, by the date stored in the quote. Not by the order the rows
+    // sit in: a restore rewrites those, and then insertion order means nothing.
+    quotes: (rows ?? [])
+      .filter((r: Row) => r?.data)
+      .map(toQuote)
+      .sort((a, b) => String(b.savedAt ?? "").localeCompare(String(a.savedAt ?? ""))),
   };
 }
 
@@ -84,8 +103,8 @@ async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Q
   const { data, error } = await sb.from("quotes").select("id,data").in("id", ids);
   if (error || !data) return quotes;          // never block a save on this
 
-  const remote = new Map<string, Quote>();
-  data.forEach((r: { id: string; data: Quote }) => { if (r?.data) remote.set(r.id, r.data); });
+  const remote = new Map<number, Quote>();
+  data.forEach((r: { id: number; data: Quote }) => { if (r?.data) remote.set(r.id, r.data); });
 
   return quotes.map((q) => {
     const r = remote.get(q.id);
@@ -107,7 +126,7 @@ export async function clearLearned(sb: SupabaseClient, owner: string) {
 /** The address a customer's link carries. A quote saved a moment ago has one
  *  only because the database minted it on insert, so it has to be read back
  *  before a link can be built from it. */
-export async function fetchShareToken(sb: SupabaseClient, id: string) {
+export async function fetchShareToken(sb: SupabaseClient, id: number) {
   const { data, error } = await sb.from("quotes").select("share_token").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   return (data?.share_token as string | undefined) ?? null;
@@ -116,7 +135,7 @@ export async function fetchShareToken(sb: SupabaseClient, id: string) {
 /** Changing a status is an act, not a side effect of saving, so it is its own
  *  write. Whoever does it last means it -- the driver reversing an approval a
  *  customer just gave included. */
-export async function setQuoteStatus(sb: SupabaseClient, id: string, status: string) {
+export async function setQuoteStatus(sb: SupabaseClient, id: number, status: string) {
   const { error } = await sb.from("quotes").update({ status }).eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -127,16 +146,23 @@ export async function push(
   st: AppState,
   viewOf?: (q: Quote) => unknown,
 ) {
+  // Only quotes that already exist. Creating one needs its id back, so it is
+  // its own call rather than a side effect of saving everything.
+  const existing = st.quotes.filter((q) => Number(q.id) > 0);
   let adopted: Quote[] | null = null;
-  if (st.quotes.length) {
-    const merged = await withCustomerEdits(sb, st.quotes);
-    const { error } = await sb
-      .from("quotes")
-      .upsert(merged.map((q) => rowFrom(q, owner, viewOf?.(q))), { onConflict: "id" });
+  if (existing.length) {
+    const merged = await withCustomerEdits(sb, existing);
+    const rows = merged.map((q) => ({
+      id: q.id,
+      owner,
+      data: contentOf(q),
+      ...(viewOf ? { customer_view: viewOf(q) } : {}),
+    }));
+    const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });
     if (error) throw new Error(error.message);
-    // Only worth handing back when a customer's correction was actually taken.
-    if (merged.some((q, i) => q !== st.quotes[i])) adopted = merged;
+    if (merged.some((q, i) => q !== existing[i])) adopted = merged;
   }
+
   const { error: e2 } = await sb.from("settings").upsert(
     {
       owner,
@@ -151,49 +177,38 @@ export async function push(
   );
   if (e2) throw new Error(e2.message);
 
-  // Absence has to mean something here, or "forget corrected distances" only
-  // clears the screen and the rows return on the next load.
+  // Deliberately no deletion here. Inferring it from an empty set would mean
+  // that any load which failed to fetch them -- offline, a hiccup, a stale tab
+  // -- looks identical to "forget them all", and the next save would wipe
+  // them. Forgetting is an act, and has its own function below.
   const pairs = Object.entries(st.learned ?? {});
   if (pairs.length) {
     const { error: e3 } = await sb.from("learned")
       .upsert(pairs.map(([pair, km]) => ({ owner, pair, km })), { onConflict: "owner,pair" });
     if (e3) throw new Error(e3.message);
   }
-  // Deliberately no deletion here. Inferring it from an empty set would mean
-  // that any load which failed to fetch them -- offline, a hiccup, a stale tab
-  // -- looks identical to "forget them all", and the next save would wipe
-  // them. Forgetting is an act, and has its own function below.
 
   return adopted;
 }
 
 /** Deleting is deliberate; absence from a save never removes anything. */
-export async function removeQuote(sb: SupabaseClient, id: string) {
+export async function removeQuote(sb: SupabaseClient, id: number) {
   const { error } = await sb.from("quotes").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
 
-/** Give a quote a new address, so any link already sent stops working.
- *  The owner may update their own rows, so this needs no extra privilege. */
-export async function rotateShareToken(sb: SupabaseClient, id: string) {
+/** Give a quote a new address, so any link already sent stops working. */
+export async function rotateShareToken(sb: SupabaseClient, id: number) {
   const token = crypto.randomUUID().replace(/-/g, "");
   const { error } = await sb.from("quotes").update({ share_token: token }).eq("id", id);
   if (error) throw new Error(error.message);
   return token;
 }
 
-/** Read one quote as a customer would, using only the public key. */
-export async function fetchQuoteByToken(sb: SupabaseClient, token: string) {
-  const { data, error } = await sb.rpc("quote_by_token", { token });
-  if (error) throw new Error(error.message);
-  return data as Record<string, unknown> | null;
-}
-
-/** Record their answer. Postgres decides whether it is allowed. */
-export async function answerQuote(sb: SupabaseClient, token: string, answer: "approved" | "declined") {
-  const { data, error } = await sb.rpc("answer_quote", { token, answer });
-  if (error) throw new Error(error.message);
-  return data as { status: string; answered_at: string };
+/** A stored quote stripped back to what it says, for writing. */
+function contentOf(q: Quote): QuoteContent & { savedAt?: string; customerEditedAt?: string } {
+  const { id, quoteNo, status, shareToken, ...content } = q;
+  return content;
 }
 
 /* ---------- taking a copy, and putting one back ---------- */
@@ -202,7 +217,8 @@ export type Backup = {
   app: "transfer-meter";
   version: 1;
   exportedAt: string;
-  quotes: { id: string; status: string; share_token: string; data: unknown; customer_view: unknown }[];
+  quotes: { id: number; quote_no: string; status: string; share_token: string;
+            data: unknown; customer_view: unknown }[];
   settings: { data: unknown; draft: unknown } | null;
   learned: { pair: string; km: number }[];
 };
@@ -211,7 +227,7 @@ export type Backup = {
  *  restored quote keeps the link already sent to its customer. */
 export async function exportAll(sb: SupabaseClient): Promise<Backup> {
   const [{ data: quotes, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
-    sb.from("quotes").select("id,status,share_token,data,customer_view").order("seq"),
+    sb.from("quotes").select("id,quote_no,status,share_token,data,customer_view").order("id"),
     sb.from("settings").select("data,draft").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
@@ -246,9 +262,10 @@ export async function importAll(
   let quotes = 0, learned = 0;
   if (Array.isArray(backup.quotes) && backup.quotes.length) {
     const rows = backup.quotes
-      .filter((q) => q && typeof q.id === "string" && q.data)
+      .filter((q) => q && Number.isInteger(Number(q.id)) && q.data)
       .map((q) => ({
-        id: q.id, owner,
+        id: Number(q.id), owner,
+        ...(typeof q.quote_no === "string" && q.quote_no ? { quote_no: q.quote_no } : {}),
         status: typeof q.status === "string" ? q.status : "draft",
         ...(typeof q.share_token === "string" && q.share_token ? { share_token: q.share_token } : {}),
         data: q.data,
@@ -284,13 +301,13 @@ export async function importAll(
   // highest number present, keeps counting from the junk.
   let removed = 0;
   if (opts.replace) {
-    const keep = new Set((backup.quotes ?? []).map((q) => q?.id).filter(Boolean) as string[]);
+    const keep = new Set((backup.quotes ?? []).map((q) => Number(q?.id)).filter(Boolean));
     const { data: have } = await sb.from("quotes").select("id");
     // Naming the rows to delete, rather than filtering by "everything except
     // this list": a quote id is safe in a list and awkward inside a filter
     // string, and the failure mode of getting that wrong is deleting the wrong
     // rows silently.
-    const drop = (have ?? []).map((r: { id: string }) => r.id).filter((id) => !keep.has(id));
+    const drop = (have ?? []).map((r: { id: number }) => r.id).filter((id) => !keep.has(id));
     if (drop.length) {
       const { error } = await sb.from("quotes").delete().in("id", drop);
       if (error) throw new Error(error.message);
@@ -304,6 +321,16 @@ export async function importAll(
       const { error } = await sb.from("learned").delete().eq("owner", owner).in("pair", dropPairs);
       if (error) throw new Error(error.message);
     }
+  }
+
+  // Restoring writes ids the database did not hand out, and an identity column
+  // does not advance for those. Without this the next new quote would ask for
+  // an id that a restored row already has, and the insert would fail. This is
+  // the setval that has to happen, and it belongs here rather than in anyone's
+  // memory of running it afterwards.
+  if (quotes) {
+    const { error } = await sb.rpc("sync_quote_ids");
+    if (error) throw new Error(error.message);
   }
 
   return { quotes, learned, removed, settings: !!backup.settings?.data };

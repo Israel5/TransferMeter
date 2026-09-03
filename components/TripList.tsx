@@ -91,18 +91,18 @@ export function TripList({
   quotes, settings, onOpen, onDelete, onPdf, onSend, onCopyLink, onRevokeLink, onPatch, onNew,
 }: {
   quotes: Quote[]; settings: Settings;
-  onOpen: (id: string) => void;
-  onDelete: (id: string) => void;
+  onOpen: (id: number) => void;
+  onDelete: (id: number) => void;
   onPdf: (q: Quote) => void;
   onSend: (q: Quote) => void;
   onCopyLink: (q: Quote) => void;
   onRevokeLink: (q: Quote) => void;
-  onPatch: (id: string, patch: Partial<Quote>) => void;
+  onPatch: (id: number, patch: Partial<Quote>) => void;
   onNew: () => void;
 }) {
-  const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [openIds, setOpenIds] = useState<Set<number>>(new Set());
   // Revoking breaks a link already in someone's hands, so it asks first.
-  const [confirming, setConfirming] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<number | null>(null);
   const [filter, setFilter] = useState("");
 
   const needle = filter.trim().toLowerCase();
@@ -119,7 +119,7 @@ export function TripList({
     .map(([s, n]) => `${n} ${s}`)
     .join(" · ");
 
-  const toggle = (id: string) =>
+  const toggle = (id: number) =>
     setOpenIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);

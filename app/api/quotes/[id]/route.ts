@@ -5,7 +5,10 @@ import { removeQuote } from "@/lib/server/store";
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await userClient();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  const { id } = await params;
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Unknown quote." }, { status: 400 });
+  }
   try {
     // Row-level security is what stops this touching anyone else's quote; the
     // id in the address is not trusted on its own.

@@ -7,7 +7,7 @@ import { Calendar } from "@/components/Calendar";
 import { Dashboard, type Run } from "@/components/Dashboard";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import {
-  initialState, loadQuote, newQuote, saveQuote, dedupeQuotes,
+  initialState, loadQuote, newQuote, saveQuote, withQuote,
   type AppState,
 } from "@/lib/state";
 import { draftMessage } from "@/lib/message";
@@ -18,7 +18,7 @@ import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
 import { reminderMessage } from "@/lib/reminders";
 import { buildMessage } from "@/lib/templates";
-import { currentSession, signOut, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
+import { currentSession, signOut, pull, push, saveQuoteToServer, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
 import type { Lang, Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
@@ -173,14 +173,30 @@ export default function Home() {
   };
 
   /* ---------- actions ---------- */
-  const doSave = () => {
+  /** Save, and take back what the database now holds -- including the number,
+   *  which it issues from the id and nothing here can guess. */
+  const saveNow = async (): Promise<Quote | null> => {
     const r = saveQuote(st);
-    if (!r.ok) { say(r.message); return; }
-    setSt(r.state); persist(r.state);
-    say(r.created ? `Saved as ${r.quote.quoteNo}.` : `Quote ${r.quote.quoteNo} updated.`);
+    if (!r.ok) { say(r.message); return null; }
+    setStore("Saving…");
+    try {
+      const saved = await saveQuoteToServer(r.content, st.settings, r.editing?.id);
+      setSt((prev) => withQuote(prev, saved));
+      setStore("Synced");
+      return saved;
+    } catch (e) {
+      setStore("Not saved");
+      say((e as Error).message);
+      return null;
+    }
   };
 
-  const patchQuote = (id: string, patch: Partial<Quote>) => {
+  const doSave = async () => {
+    const saved = await saveNow();
+    if (saved) say(`Saved as ${saved.quoteNo}.`);
+  };
+
+  const patchQuote = (id: number, patch: Partial<Quote>) => {
     setSt((prev) => {
       const next = { ...prev, quotes: prev.quotes.map((q) => (q.id === id ? { ...q, ...patch } : q)) };
       persist(next); return next;
@@ -193,7 +209,7 @@ export default function Home() {
     }
   };
 
-  const doDelete = async (id: string) => {
+  const doDelete = async (id: number) => {
     setSt((prev) => { const next = { ...prev, quotes: prev.quotes.filter((q) => q.id !== id) }; persist(next); return next; });
     if (signedIn) {
       try { await removeQuote(id); }
@@ -283,16 +299,9 @@ export default function Home() {
   /** Every editor action that acts on "this quote" has to save it first and
    *  keep what the save returned. Discarding it, as these used to, left the
    *  quote unstored, its number reusable, and its link pointing at nothing. */
-  const saveThen = async (act: (q: Quote) => void | Promise<void>, needsDatabase = true) => {
-    const r = saveQuote(st);
-    if (!r.ok) { say(r.message); return; }
-    setSt(r.state);
-    if (needsDatabase) {
-      try { await persistNow(r.state); } catch (e) { say((e as Error).message); return; }
-    } else {
-      persist(r.state);
-    }
-    await act(r.quote);
+  const saveThen = async (act: (q: Quote) => void | Promise<void>) => {
+    const saved = await saveNow();
+    if (saved) await act(saved);
   };
 
   const remind = async (r: Run, kind: "before" | "onway", lang: Lang) => {
@@ -415,7 +424,7 @@ export default function Home() {
                 quoteText={draftMessage(st)}
                 onSave={doSave}
                 onSend={() => saveThen(sendQuote)}
-                onPdf={() => saveThen(async (q) => savePdf(q), false)}
+                onPdf={() => saveThen(async (q) => savePdf(q))}
                 onCopyLink={() => saveThen(copyLink)}
                 onNewQuote={() => { const next = newQuote(st); setSt(next); persist(next); }}
                 onBack={() => setView(cameFrom)}

@@ -192,7 +192,7 @@ export default function RequestQuote() {
           token,
           payload: {
             customer: name.trim(), contact: contact.trim(), lang,
-            note: note.trim(), first_date: date || null, trips,
+            note: note.trim(), trips,
             pax: counts.pax, gear: counts.gear, bags: counts.bags,
           },
         }),

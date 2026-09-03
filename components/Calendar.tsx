@@ -10,7 +10,7 @@ type Leg = {
   customer: string; quoteNo: string; label: string;
   km: number; price: number; cost: number; estCost: number; measured: boolean;
   tip: number; paid: boolean;
-  from: string; to: string; quoteId: string; legIndex: number;
+  from: string; to: string; quoteId: number; legIndex: number;
 };
 
 /** Works in legs, not quotes: a round trip appears on both of its days. */
@@ -44,7 +44,7 @@ export function Calendar({
   quotes, settings, onPatch,
 }: {
   quotes: Quote[]; settings: Settings;
-  onPatch: (id: string, patch: Partial<Quote>) => void;
+  onPatch: (id: number, patch: Partial<Quote>) => void;
 }) {
   const now = new Date();
   const [month, setMonth] = useState(new Date(now.getFullYear(), now.getMonth(), 1));

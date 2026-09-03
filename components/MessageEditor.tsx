@@ -27,7 +27,7 @@ function sampleQuote(quotes: Quote[]): Quote {
   const real = (quotes ?? []).find((q) => (q.trips ?? []).some((t) => t.date) && q.customer);
   if (real) return real;
   return {
-    id: "sample", savedAt: new Date().toISOString(), quoteNo: "2026-001",
+    id: 1, savedAt: new Date().toISOString(), quoteNo: "2026-001", origin: "driver",
     customer: "Ana Souza", contact: "", notes: "", status: "sent", lang: "pt",
     trips: [{
       label: "Outbound", date: new Date().toISOString().slice(0, 10), time: "17:00",
@@ -38,7 +38,7 @@ function sampleQuote(quotes: Quote[]): Quote {
     }],
     pax: { adults: 2, children: 1, infants: 0 }, gear: {}, bags: { checked: 2, carry: 2 },
     totalKm: 44, cost: 17.6, price: 60, mins: 95, keep: 42.4,
-  } as Quote;
+  };
 }
 
 export function MessageEditor({

@@ -1,5 +1,5 @@
 import { DEFAULTS, emptyPax, emptyGear, emptyBags } from "./types";
-import type { Counts, Lang, Quote, SavedTrip, Settings, Stop, Trip } from "./types";
+import type { Counts, Lang, Quote, QuoteContent, SavedTrip, Settings, Stop, Trip } from "./types";
 import { tripTotals, grandTotals } from "./quote";
 
 export type AppState = {
@@ -10,7 +10,7 @@ export type AppState = {
   pax: Counts; gear: Counts; bags: Counts;
   customer: string; contact: string; notes: string;
   quoteNo: string;
-  editingId: string | null;
+  editingId: number | null;
   quotes: Quote[];
   lang: Lang;
 };
@@ -46,31 +46,14 @@ export function initialState(): AppState {
   };
 }
 
-/** One past the highest number actually saved this year, so nothing drifts. */
-export function nextQuoteNo(quotes: Quote[]) {
-  const year = new Date().getFullYear();
-  let highest = 0;
-  quotes.forEach((q) => {
-    const m = String(q?.quoteNo ?? "").match(/^(\d{4})-0*(\d+)$/);
-    if (m && Number(m[1]) === year) highest = Math.max(highest, Number(m[2]));
-  });
-  return `${year}-${String(highest + 1).padStart(3, "0")}`;
-}
-
-export function makeId() {
-  return "q" + Date.now().toString(36) + Math.floor((performance.now() * 1000) % 1000).toString(36);
-}
-
-export function snapshot(st: AppState, id?: string): Quote {
+/** The quote as the driver has written it. No id, no number, no status: those
+ *  belong to the database, and a snapshot is only ever the content. */
+export function snapshot(st: AppState): QuoteContent {
   const g = grandTotals(st.trips, st.settings, st.learned);
   return {
-    id: id ?? makeId(),
-    savedAt: new Date().toISOString(),
     customer: st.customer.trim(),
     contact: st.contact.trim(),
     notes: st.notes.trim(),
-    quoteNo: st.quoteNo.trim(),
-    status: "draft",
     origin: "driver",
     lang: st.lang,
     trips: st.trips.map((t): SavedTrip => {
@@ -91,60 +74,48 @@ export function snapshot(st: AppState, id?: string): Quote {
 }
 
 export type SaveResult =
-  | { ok: false; reason: "empty" | "clash"; message: string }
-  | { ok: true; state: AppState; created: boolean; quote: Quote };
+  | { ok: false; message: string }
+  | { ok: true; state: AppState; content: QuoteContent; editing: Quote | null };
 
-/** Identity is the id of the quote you opened, never the editable number. */
+/** Work out what to save. Editing keeps the quote you opened; otherwise this
+ *  is a new one and the database will give it an id and a number.
+ *
+ *  Deliberately returns rather than writes: only the caller can wait for the
+ *  database, and a new quote has no identity until it has. */
 export function saveQuote(st: AppState): SaveResult {
   const named = st.trips.some((t) => t.stops.some((s) => !s.base && String(s.name || "").trim()));
   if (!named) {
-    return { ok: false, reason: "empty", message: "Nothing to save yet — add where you're picking the customer up." };
+    return { ok: false, message: "Nothing to save yet — add where you're picking the customer up." };
   }
 
-  const quoteNo = st.quoteNo.trim() || nextQuoteNo(st.quotes);
-  let i = st.editingId ? st.quotes.findIndex((q) => q.id === st.editingId) : -1;
-  if (i < 0 && quoteNo) i = st.quotes.findIndex((q) => q.quoteNo === quoteNo);
+  const editing = st.editingId != null
+    ? st.quotes.find((q) => q.id === st.editingId) ?? null
+    : null;
 
-  const clash = st.quotes.find((q, n) => n !== i && q.quoteNo === quoteNo);
-  if (clash) {
-    return { ok: false, reason: "clash",
-      message: `Number ${quoteNo} already belongs to ${clash.customer || "another trip"}.` };
-  }
-
-  const withNo = { ...st, quoteNo };
-  const quotes = st.quotes.slice();
-  let created: boolean;
-  let snap: Quote;
-
-  if (i >= 0) {
-    const prev = quotes[i];
-    snap = snapshot(withNo, prev.id);           // editing must not change identity
-    snap.status = prev.status || "draft";
-    snap.savedAt = prev.savedAt;
-    snap.origin = prev.origin ?? "driver";
+  const content = snapshot(st);
+  if (editing) {
     // Tips, payments and fuel readings record what happened; a revised price
     // must not erase them.
-    snap.trips.forEach((t, n) => {
-      const p = prev.trips?.[n];
+    content.trips.forEach((t, n) => {
+      const p = editing.trips?.[n];
       if (p?.tip) t.tip = p.tip;
       if (p?.paid) t.paid = true;
       if (p?.actual) t.actual = { ...p.actual };
     });
-    quotes[i] = snap;
-    created = false;
-  } else {
-    snap = snapshot(withNo);
-    quotes.unshift(snap);
-    created = true;
   }
 
-  return { ok: true, created, quote: snap,
-    // Keeping the newest N on screen; nothing is deleted by this, the rest are
-    // still in the database. At a few transfers a week this is decades away.
-    state: { ...withNo, quotes: quotes.slice(0, 2000), editingId: snap.id } };
+  return { ok: true, content, editing, state: st };
 }
 
-export function loadQuote(st: AppState, id: string): AppState {
+/** Fold a saved quote back into what is on screen. */
+export function withQuote(st: AppState, q: Quote): AppState {
+  const i = st.quotes.findIndex((x) => x.id === q.id);
+  const quotes = st.quotes.slice();
+  if (i >= 0) quotes[i] = q; else quotes.unshift(q);
+  return { ...st, quotes, editingId: q.id, quoteNo: q.quoteNo };
+}
+
+export function loadQuote(st: AppState, id: number): AppState {
   const q = st.quotes.find((x) => x.id === id);
   if (!q) return st;
   return {
@@ -171,20 +142,6 @@ export function newQuote(st: AppState): AppState {
     customer: "", contact: "", notes: "", quoteNo: "", editingId: null,
     pax: emptyPax(), gear: emptyGear(), bags: emptyBags(),
   };
-}
-
-/** One quote number is one job; older copies of it are dropped. */
-export function dedupeQuotes(list: Quote[]) {
-  const seen = new Set<string>(), out: Quote[] = [];
-  for (const q of list ?? []) {
-    if (!q) continue;
-    const byId = "id:" + q.id;
-    const byNo = q.quoteNo ? `no:${q.quoteNo}|${q.customer ?? ""}` : null;
-    if (seen.has(byId) || (byNo && seen.has(byNo))) continue;
-    seen.add(byId); if (byNo) seen.add(byNo);
-    out.push(q);
-  }
-  return out;
 }
 
 export const owedOn = (q: Quote) =>

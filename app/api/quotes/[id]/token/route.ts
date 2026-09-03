@@ -6,7 +6,10 @@ import { fetchShareToken, rotateShareToken } from "@/lib/server/store";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await userClient();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  const { id } = await params;
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Unknown quote." }, { status: 400 });
+  }
   try {
     return NextResponse.json({ token: await fetchShareToken(me.sb, id) });
   } catch (e) {
@@ -20,7 +23,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await userClient();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  const { id } = await params;
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Unknown quote." }, { status: 400 });
+  }
   try {
     return NextResponse.json({ token: await rotateShareToken(me.sb, id) });
   } catch (e) {

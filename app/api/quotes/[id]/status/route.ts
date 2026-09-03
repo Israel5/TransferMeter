@@ -7,7 +7,10 @@ const ALLOWED = ["draft", "requested", "sent", "approved", "declined"];
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const me = await userClient();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
-  const { id } = await params;
+  const id = Number((await params).id);
+  if (!Number.isInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Unknown quote." }, { status: 400 });
+  }
 
   let body: { status?: unknown };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Malformed request." }, { status: 400 }); }

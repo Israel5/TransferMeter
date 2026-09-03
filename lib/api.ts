@@ -52,22 +52,32 @@ export async function push(state: AppState): Promise<Quote[] | null> {
   return r.adopted ?? null;
 }
 
-export async function setQuoteStatus(id: string, status: string) {
-  await call(`/api/quotes/${encodeURIComponent(id)}/status`, {
+/** Save a quote and get it back as the database now holds it -- with its id,
+ *  its number, and the customer's copy rebuilt. */
+export async function saveQuoteToServer(
+  content: unknown, settings: unknown, id?: number,
+): Promise<Quote> {
+  return call<Quote>("/api/quotes", {
+    method: "POST", body: JSON.stringify({ content, settings, ...(id ? { id } : {}) }),
+  });
+}
+
+export async function setQuoteStatus(id: number, status: string) {
+  await call(`/api/quotes/${id}/status`, {
     method: "PUT", body: JSON.stringify({ status }),
   });
 }
 
-export async function removeQuote(id: string) {
-  await call(`/api/quotes/${encodeURIComponent(id)}`, { method: "DELETE" });
+export async function removeQuote(id: number) {
+  await call(`/api/quotes/${id}`, { method: "DELETE" });
 }
 
-export async function fetchShareToken(id: string) {
-  return (await call<{ token: string | null }>(`/api/quotes/${encodeURIComponent(id)}/token`)).token;
+export async function fetchShareToken(id: number) {
+  return (await call<{ token: string | null }>(`/api/quotes/${id}/token`)).token;
 }
 
-export async function rotateShareToken(id: string) {
-  return (await call<{ token: string }>(`/api/quotes/${encodeURIComponent(id)}/token`,
+export async function rotateShareToken(id: number) {
+  return (await call<{ token: string }>(`/api/quotes/${id}/token`,
     { method: "POST" })).token;
 }
 

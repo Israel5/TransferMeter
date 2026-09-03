@@ -62,7 +62,7 @@ function Block({
   kind: "before" | "onway";
   settings: Settings;
   onRemind: (r: Run, kind: "before" | "onway", lang: Lang) => void;
-  onOpen: (id: string) => void;
+  onOpen: (id: number) => void;
 }) {
   // Which language each message goes out in. Starts as the one the quote was
   // written in, because that is usually right, and is one tap to change.
@@ -140,7 +140,7 @@ export function Dashboard({
 }: {
   quotes: Quote[]; settings: Settings; learned: Record<string, number>;
   onRemind: (r: Run, kind: "before" | "onway", lang: Lang) => void;
-  onOpen: (id: string) => void;
+  onOpen: (id: number) => void;
 }) {
   const today = runsOn(quotes, isoDay(0), settings, learned);
   const tomorrow = runsOn(quotes, isoDay(1), settings, learned);

@@ -67,22 +67,29 @@ export type SavedTrip = {
   onWayAt?: string;
 };
 
-export type Quote = {
-  id: string;
-  savedAt: string;
-  quoteNo: string;
+/** What a quote says: everything the driver writes, and nothing the database
+ *  decides. This is what gets sent when a quote is created or edited. */
+export type QuoteContent = {
   customer: string;
   contact: string;
   notes: string;
-  status: QuoteStatus;
-  origin?: "driver" | "customer";
+  origin: "driver" | "customer";
   lang: Lang;
   trips: SavedTrip[];
   pax: Counts; gear: Counts; bags: Counts;
   totalKm: number; cost: number; price: number; mins: number; keep: number;
-  /** Addresses this quote for a customer. Lives on the row, not in the data. */
+};
+
+/** A stored quote: its content, plus the four things only the database says.
+ *  None of these are written by the app, and none of them live in the content:
+ *  the id issues the number, the status follows an act, and the token is the
+ *  address a customer's link carries. */
+export type Quote = QuoteContent & {
+  id: number;
+  quoteNo: string;
+  savedAt: string;
+  status: QuoteStatus;
   shareToken?: string;
-  /** Set by the database when a customer corrects their own counts. */
   customerEditedAt?: string;
 };
 
