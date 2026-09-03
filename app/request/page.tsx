@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+// The "min" metadata: formats and validates every country without shipping the
+// full carrier and geocoding tables, which are several times larger and of no
+// use to a form that only needs a reachable number.
+import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/min";
+import "react-phone-number-input/style.css";
 
 /* The page a customer lands on to ask for a transfer.
  *
@@ -27,6 +32,8 @@ const T = {
     needName: "Diga-me o seu nome.", needContact: "Preciso de uma forma de lhe responder.",
     needFrom: "Diga-me onde o apanho.", needTo: "Diga-me para onde vai.",
     needHuman: "Confirme que não é um robô.",
+    how: "Como quer que eu fale consigo?", byPhone: "Telefone", byHandle: "Utilizador",
+    badPhone: "Esse número não parece completo.",
     adults: "Adultos", children: "Crianças", infants: "Bebês",
     infantSeat: "Bebê conforto", carSeat: "Cadeirinha", booster: "Booster",
     checked: "Malas", carry: "Malas de mão", backpack: "Mochilas",
@@ -46,6 +53,8 @@ const T = {
     needName: "Please tell me your name.", needContact: "I need a way to reply to you.",
     needFrom: "Where should I pick you up?", needTo: "Where are you going?",
     needHuman: "Please confirm you're not a robot.",
+    how: "How should I reach you?", byPhone: "Phone", byHandle: "Username",
+    badPhone: "That number doesn't look complete.",
     adults: "Adults", children: "Children", infants: "Babies",
     infantSeat: "Infant seat", carSeat: "Car seat", booster: "Booster",
     checked: "Suitcases", carry: "Carry-ons", backpack: "Backpacks",
@@ -65,6 +74,8 @@ const T = {
     needName: "Dites-moi votre nom.", needContact: "Il me faut un moyen de vous répondre.",
     needFrom: "Où dois-je vous prendre ?", needTo: "Où allez-vous ?",
     needHuman: "Confirmez que vous n'êtes pas un robot.",
+    how: "Comment vous joindre ?", byPhone: "Téléphone", byHandle: "Nom d'utilisateur",
+    badPhone: "Ce numéro semble incomplet.",
     adults: "Adultes", children: "Enfants", infants: "Bébés",
     infantSeat: "Siège bébé", carSeat: "Siège d'auto", booster: "Siège d'appoint",
     checked: "Valises", carry: "Bagages à main", backpack: "Sacs à dos",
@@ -92,7 +103,13 @@ export default function RequestQuote() {
   const L = T[lang];
 
   const [name, setName] = useState("");
-  const [contact, setContact] = useState("");
+  // Two ways people are actually reachable on WhatsApp: a number, or a
+  // username. The number is kept in its international form, which is what a
+  // wa.me link wants and what survives being read in another country.
+  const [contactBy, setContactBy] = useState<"phone" | "handle">("phone");
+  const [phone, setPhone] = useState<string | undefined>(undefined);
+  const [handle, setHandle] = useState("");
+  const contact = contactBy === "phone" ? (phone ?? "") : (handle.trim() ? `@${handle.trim().replace(/^@+/, "")}` : "");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState("");
@@ -155,6 +172,9 @@ export default function RequestQuote() {
     setError("");
     if (!name.trim()) return setError(L.needName);
     if (!contact.trim()) return setError(L.needContact);
+    // A half-typed number is worse than none: it looks answered and reaches
+    // nobody. The library knows each country's shape, so let it say.
+    if (contactBy === "phone" && !isValidPhoneNumber(contact)) return setError(L.badPhone);
     if (!from.trim()) return setError(L.needFrom);
     if (!to.trim()) return setError(L.needTo);
     if (siteKey && !token) return setError(L.needHuman);
@@ -241,11 +261,30 @@ export default function RequestQuote() {
               <span>{L.name}</span>
               <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             </label>
-            <label className="rq-field">
+            <div className="rq-field">
               <span>{L.contact}</span>
-              <input value={contact} onChange={(e) => setContact(e.target.value)}
-                     inputMode="tel" autoComplete="tel" />
-            </label>
+              <div className="rq-toggle" role="group" aria-label={L.how}>
+                <button type="button" aria-pressed={contactBy === "phone"}
+                        onClick={() => setContactBy("phone")}>{L.byPhone}</button>
+                <button type="button" aria-pressed={contactBy === "handle"}
+                        onClick={() => setContactBy("handle")}>{L.byHandle}</button>
+              </div>
+              {contactBy === "phone" ? (
+                <PhoneInput
+                  international
+                  defaultCountry="CA"
+                  countryCallingCodeEditable={false}
+                  value={phone}
+                  onChange={setPhone}
+                  autoComplete="tel" />
+              ) : (
+                <span className="rq-handle">
+                  <span>@</span>
+                  <input value={handle} autoComplete="off" spellCheck={false}
+                         onChange={(e) => setHandle(e.target.value.replace(/^@+/, ""))} />
+                </span>
+              )}
+            </div>
           </div>
         </section>
 
