@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialState, saveQuote, hasUnsavedChanges, loadQuote, withQuote } from "./state";
+import { initialState, saveQuote, hasUnsavedChanges, loadQuote, withQuote, affectsCustomer } from "./state";
 import type { AppState } from "./state";
 import type { Quote, Stop } from "./types";
 
@@ -167,5 +167,31 @@ describe("payments follow their own leg, not a position", () => {
     delete (st.trips[0] as { legId?: string }).legId;
     const after = saveQuote(st);
     expect(after.ok && after.content.trips[0].tip).toBe(7);
+  });
+});
+
+describe("changing a quote someone already has", () => {
+  it("says nothing about a draft", () => {
+    const st = editing(saved({ status: "draft" }));
+    expect(affectsCustomer({ ...st, trips: [{ ...st.trips[0], priceOverride: 60 }] })).toBeNull();
+  });
+
+  it("says nothing when the price and the dates are unchanged", () => {
+    const st = editing(saved({ status: "approved" }));
+    expect(affectsCustomer({ ...st, customer: "Pedro S", notes: "gate 4" })).toBeNull();
+  });
+
+  it("speaks up when the price changes on an approved quote", () => {
+    const st = editing(saved({ status: "approved", customer: "Lu" }));
+    const w = affectsCustomer({ ...st, trips: [{ ...st.trips[0], priceOverride: 60 }] });
+    expect(w).not.toBeNull();
+    expect(w!.customer).toBe("Lu");
+    expect(w!.when).toBe("approved");
+  });
+
+  it("speaks up when a date moves on a quote already sent", () => {
+    const st = editing(saved({ status: "sent" }));
+    const w = affectsCustomer({ ...st, trips: [{ ...st.trips[0], date: "2026-09-30" }] });
+    expect(w?.when).toBe("was sent");
   });
 });

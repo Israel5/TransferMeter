@@ -367,6 +367,14 @@ a.link:hover{text-decoration:underline}
   color:var(--muted);text-decoration:underline;text-underline-offset:3px;
 }
 .link.discard:hover{color:var(--bad)}
+/* Saving is about to change what someone already holds a link to. */
+.reaches{
+  border:1px solid color-mix(in srgb,var(--amber) 50%,transparent);
+  background:color-mix(in srgb,var(--amber) 10%,transparent);
+  border-radius:11px;padding:14px 16px;margin-bottom:14px;
+}
+.reaches p{margin:0;font-size:.92rem;line-height:1.55}
+.reaches b{color:var(--amber)}
 .unsaved{
   flex:none;font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
   letter-spacing:.07em;font-size:.66rem;font-weight:600;white-space:nowrap;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { StopRow, type Suggestion } from "./StopRow";
 import { CounterGroup } from "./Counters";
 import { Meter } from "./Meter";
@@ -9,7 +10,7 @@ import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact } from "@/lib/whatsapp";
 import { parseCoords } from "@/lib/quote";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "@/lib/types";
-import { hasUnsavedChanges } from "@/lib/state";
+import { hasUnsavedChanges, affectsCustomer } from "@/lib/state";
 import type { AppState } from "@/lib/state";
 import type { Lang, Stop, Trip } from "@/lib/types";
 
@@ -46,6 +47,8 @@ export function Editor({
       ? `More child seats (${seats}) than children and babies. Worth double-checking.`
       : "";
 
+  const [confirm, setConfirm] = useState(false);
+
   const stops = trip.stops;
   const patchStops = (next: Stop[]) => setTrip(st.active, { stops: next, liveLegs: null });
 
@@ -59,9 +62,28 @@ export function Editor({
   }
 
   const dirty = hasUnsavedChanges(st);
+  // Saving is what makes a change visible on the link they already hold.
+  const reaches = affectsCustomer(st);
 
   return (
     <div id="view-quote">
+      {confirm && reaches && (
+        <div className="reaches" role="alertdialog" aria-live="assertive">
+          <p>
+            <b>{reaches.customer}</b>
+            {reaches.when === "approved"
+              ? " approved this quote."
+              : reaches.when === "declined" ? " declined this quote." : " has already been sent this quote."}
+            {" Saving shows them the new "}
+            {"price and dates on the link they already have."}
+          </p>
+          <div className="route-actions" style={{ borderTop: 0, paddingTop: 8 }}>
+            <button className="btn" type="button" onClick={() => setConfirm(false)}>Cancel</button>
+            <button className="btn wants-saving" type="button"
+                    onClick={() => { setConfirm(false); onSave(); }}>Save anyway</button>
+          </div>
+        </div>
+      )}
       <div className="backbar">
         <button className="btn" type="button" onClick={onBack}>← All trips</button>
         <span className="backbar-who">
@@ -74,7 +96,9 @@ export function Editor({
             could sit looking finished while the trips list showed the old one. */}
         {dirty && <span className="unsaved">Not saved yet</span>}
         <button className={"btn" + (dirty ? " wants-saving" : "")} type="button"
-                onClick={onSave}>{dirty ? "Save changes" : "Saved"}</button>
+                onClick={() => { if (dirty && reaches) setConfirm(true); else onSave(); }}>
+          {dirty ? "Save changes" : "Saved"}
+        </button>
         {/* Editing survives a closed laptop, which means what you see on
             opening a quote may be work in progress rather than what is stored.
             Keeping it is right; being unable to put it down is not. */}

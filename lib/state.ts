@@ -202,6 +202,29 @@ export function hasUnsavedChanges(st: AppState): boolean {
   return shapeOf(st) !== savedShapeOf(saved);
 }
 
+/** Whether saving would change what a customer already holds a link to.
+ *
+ *  Their link shows the quote as it stands, which is what you asked for -- so a
+ *  price or a date changing on a quote they have already been sent is
+ *  something they will see. Names and notes are not: they are not on the page.
+ *
+ *  Returns what to say, or null when there is nothing worth stopping for. */
+export function affectsCustomer(st: AppState): { customer: string; when: string } | null {
+  if (st.editingId == null) return null;
+  const saved = st.quotes.find((q) => q.id === st.editingId);
+  if (!saved) return null;
+  if (!["sent", "approved", "declined"].includes(saved.status ?? "draft")) return null;
+
+  const before = (saved.trips ?? []).map((t) => `${t.price}|${t.date}|${t.time}`).join(";");
+  const after = st.trips.map((t) => `${t.priceOverride}|${t.date}|${t.time}`).join(";");
+  if (before === after) return null;
+
+  return {
+    customer: (saved.customer || "your customer").trim(),
+    when: saved.status === "approved" ? "approved" : saved.status === "declined" ? "declined" : "was sent",
+  };
+}
+
 export const owedOn = (q: Quote) =>
   (q.trips ?? []).reduce((n, t) => n + (t.paid ? 0 : Number(t.price) || 0), 0);
 
