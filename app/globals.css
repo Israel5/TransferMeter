@@ -1038,11 +1038,14 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 }
 
 /* Correcting the counts: big targets, no keyboard */
-.cq-group{margin-bottom:16px}
-.cq-group:last-of-type{margin-bottom:6px}
+.cq-group{margin-bottom:14px}
+.cq-group:last-of-type{margin-bottom:4px}
+/* Passengers, child seats and luggage are three separate questions. Run them
+   together and the last row of one reads as the first row of the next. */
+.cq-group + .cq-group{margin-top:26px}
 .cq-group h3{
   font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
-  font-size:.7rem;font-weight:600;color:var(--muted);margin:0 0 8px;
+  font-size:.7rem;font-weight:600;color:var(--muted);margin:0 0 10px;
 }
 .cq-count{
   display:flex;align-items:center;justify-content:space-between;gap:12px;
