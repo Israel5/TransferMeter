@@ -58,14 +58,14 @@ tested on their own.
 
 ## Environment
 
-Copy `.env.example` to `.env`. Four variables run the app: the Google key, the
-country to bias addresses to, and the Supabase URL and anon key.
+Copy `.env.example` to `.env`. Seven variables run the app; `.env.example`
+says which, and `DEPLOY.md` says where each one comes from.
 
-The Google key is read on the server only, which is why Google is reached
-through `/api` rather than from the page. The two `NEXT_PUBLIC_` values are
-compiled into the bundle and are meant to be public — the anon role has no
-privilege on any table, so a signed-out visitor can call exactly the three
-functions a customer's link needs and nothing else.
+Nothing reaches a browser except the Turnstile site key, which is what a site
+key is for. Every page talks to this site's own `/api` routes and no further;
+those routes hold the keys. The session is an httpOnly cookie, so no script on
+the page can read it, and the address lookup is shut to anyone who has not
+passed a challenge.
 
 The service key and the database URL are for migrations and
 `scripts/set-password.mjs`. They stay on your machine; no deployed file reads
