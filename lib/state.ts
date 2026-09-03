@@ -144,6 +144,45 @@ export function newQuote(st: AppState): AppState {
   };
 }
 
+/** What the editor is holding, reduced to the things a driver would call a
+ *  change. Not the computed totals: those wobble in the last decimal place
+ *  between one render and the next and would report a change that is not one. */
+const shapeOf = (st: AppState) => JSON.stringify({
+  customer: st.customer.trim(), contact: st.contact.trim(), notes: st.notes.trim(),
+  lang: st.lang, pax: st.pax, gear: st.gear, bags: st.bags,
+  trips: st.trips.map((t) => ({
+    label: t.label, date: t.date, time: t.time,
+    price: t.priceOverride,
+    stops: t.stops.map((x) => `${x.base ? "@base" : String(x.name ?? "").trim()}`),
+  })),
+});
+
+const savedShapeOf = (q: Quote) => JSON.stringify({
+  customer: (q.customer ?? "").trim(), contact: (q.contact ?? "").trim(),
+  notes: (q.notes ?? "").trim(), lang: q.lang, pax: q.pax, gear: q.gear, bags: q.bags,
+  trips: (q.trips ?? []).map((t) => ({
+    label: t.label, date: t.date, time: t.time,
+    price: t.price,
+    stops: (t.stops ?? []).map((x) => `${x.base ? "@base" : String(x.name ?? "").trim()}`),
+  })),
+});
+
+/** Whether the quote on screen differs from the one in the database.
+ *
+ *  The sync indicator answers a different question -- whether the draft
+ *  reached the server -- and reading it as "saved" is how a price typed into
+ *  the editor can sit there looking finished while the trips list still shows
+ *  the old one. */
+export function hasUnsavedChanges(st: AppState): boolean {
+  if (st.editingId == null) {
+    // Nothing opened: unsaved only once there is something worth saving.
+    return st.trips.some((t) => t.stops.some((s) => !s.base && String(s.name || "").trim()));
+  }
+  const saved = st.quotes.find((q) => q.id === st.editingId);
+  if (!saved) return true;
+  return shapeOf(st) !== savedShapeOf(saved);
+}
+
 export const owedOn = (q: Quote) =>
   (q.trips ?? []).reduce((n, t) => n + (t.paid ? 0 : Number(t.price) || 0), 0);
 

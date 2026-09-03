@@ -8,6 +8,7 @@ import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact } from "@/lib/whatsapp";
 import { parseCoords } from "@/lib/quote";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "@/lib/types";
+import { hasUnsavedChanges } from "@/lib/state";
 import type { AppState } from "@/lib/state";
 import type { Lang, Stop, Trip } from "@/lib/types";
 
@@ -55,6 +56,8 @@ export function Editor({
     patchStops(next);
   }
 
+  const dirty = hasUnsavedChanges(st);
+
   return (
     <div id="view-quote">
       <div className="backbar">
@@ -63,6 +66,13 @@ export function Editor({
           {(st.quoteNo.trim() ? `#${st.quoteNo.trim()}` : "Unsaved trip")
             + (st.customer.trim() ? `  ·  ${st.customer.trim()}` : "")}
         </span>
+        {/* Saving belongs where you are, not at the foot of a long column. And
+            the sync indicator only ever said the draft reached the server: it
+            never said the quote was saved, which is how a price typed here
+            could sit looking finished while the trips list showed the old one. */}
+        {dirty && <span className="unsaved">Not saved yet</span>}
+        <button className={"btn" + (dirty ? " wants-saving" : "")} type="button"
+                onClick={onSave}>{dirty ? "Save changes" : "Saved"}</button>
       </div>
 
       <div className="grid">
@@ -254,7 +264,8 @@ export function Editor({
 
               <div className="route-actions" style={{ borderTop: 0, paddingTop: 10, marginTop: 0 }}>
                 <button className="btn primary" type="button" onClick={onSend}>Send</button>
-                <button className="btn" type="button" onClick={onSave}>Save quote</button>
+                <button className={"btn" + (dirty ? " wants-saving" : "")} type="button"
+                        onClick={onSave}>{dirty ? "Save changes" : "Save quote"}</button>
                 <button className="btn" type="button" onClick={onCopyLink}>Copy link</button>
                 <button className="btn" type="button" onClick={onPdf}>PDF</button>
                 <button className="btn" type="button" onClick={onNewQuote}>New quote</button>
