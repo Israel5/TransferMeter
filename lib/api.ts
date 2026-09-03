@@ -83,9 +83,9 @@ export async function fetchBackup(): Promise<unknown> {
   return r.json();
 }
 
-export async function restoreBackup(backup: unknown) {
-  return call<{ quotes: number; learned: number; settings: boolean }>("/api/backup", {
-    method: "POST", body: JSON.stringify(backup),
+export async function restoreBackup(backup: unknown, replace = false) {
+  return call<{ quotes: number; learned: number; removed: number; settings: boolean }>("/api/backup", {
+    method: "POST", body: JSON.stringify({ backup, replace }),
   });
 }
 

@@ -29,6 +29,7 @@ export function BackupPanel({ onRestored }: { onRestored: () => void }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad?: boolean } | null>(null);
   const [peek, setPeek] = useState<Peek | null>(null);
+  const [replace, setReplace] = useState(false);
 
   const download = async () => {
     setBusy(true); setMsg(null);
@@ -52,7 +53,7 @@ export function BackupPanel({ onRestored }: { onRestored: () => void }) {
   /** Read and describe the file before anything is written, so the confirming
    *  is done against what is actually in it rather than its name. */
   const chosen = async (f: File | null) => {
-    setMsg(null); setPeek(null);
+    setMsg(null); setPeek(null); setReplace(false);
     if (!f) return;
     try {
       const raw = JSON.parse(await f.text());
@@ -73,12 +74,13 @@ export function BackupPanel({ onRestored }: { onRestored: () => void }) {
     if (!peek) return;
     setBusy(true); setMsg(null);
     try {
-      const r = await restoreBackup(peek.raw);
+      const r = await restoreBackup(peek.raw, replace);
       setPeek(null);
       if (file.current) file.current.value = "";
       setMsg({ text: `Restored ${r.quotes} quote${r.quotes === 1 ? "" : "s"}`
         + `${r.settings ? ", your settings" : ""}`
-        + `${r.learned ? ` and ${r.learned} corrected distance${r.learned === 1 ? "" : "s"}` : ""}.` });
+        + `${r.learned ? ` and ${r.learned} corrected distance${r.learned === 1 ? "" : "s"}` : ""}.`
+        + `${r.removed ? ` Removed ${r.removed} that were not in the file.` : ""}` });
       onRestored();
     } catch (e) {
       setMsg({ text: (e as Error).message, bad: true });
@@ -115,16 +117,22 @@ export function BackupPanel({ onRestored }: { onRestored: () => void }) {
             {` — saved ${when(peek.exportedAt)}.`}
           </p>
           <p className="note">
-            Restoring adds these and overwrites anything with the same quote number.
-            It never deletes: a quote that is here but not in the file stays exactly as it is.
+            {replace
+              ? "Everything not in this file will be deleted — quotes you have added since it was taken, and the numbering will carry on from the file rather than from them."
+              : "Adds these and overwrites anything with the same id. Nothing is deleted: a quote that is here but not in the file stays as it is, and keeps its place in the numbering."}
           </p>
+          <label className="rq-check" style={{ marginTop: 6 }}>
+            <input type="checkbox" checked={replace}
+                   onChange={(e) => setReplace(e.target.checked)} />
+            <span>Delete anything that is not in this file</span>
+          </label>
           <div className="route-actions" style={{ borderTop: 0, paddingTop: 4 }}>
             <button className="btn" type="button" disabled={busy}
                     onClick={() => { setPeek(null); if (file.current) file.current.value = ""; }}>
               Cancel
             </button>
             <button className="btn danger" type="button" disabled={busy} onClick={restore}>
-              {busy ? "Restoring…" : "Restore this backup"}
+              {busy ? "Restoring…" : replace ? "Replace everything with this backup" : "Restore this backup"}
             </button>
           </div>
         </div>

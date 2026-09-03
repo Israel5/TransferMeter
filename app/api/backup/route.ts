@@ -27,12 +27,17 @@ export async function POST(req: Request) {
   const me = await userClient();
   if (!me) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
-  let body: Backup;
+  let body: { backup?: Backup; replace?: unknown };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "That file is not readable JSON." }, { status: 400 }); }
 
+  // Replacing deletes, so it has to be asked for explicitly and cannot be the
+  // effect of a missing field.
+  const replace = body?.replace === true;
+  const backup = (body?.backup ?? body) as Backup;
+
   try {
-    return NextResponse.json({ ok: true, ...(await importAll(me.sb, me.owner, body)) });
+    return NextResponse.json({ ok: true, ...(await importAll(me.sb, me.owner, backup, { replace })) });
   } catch (e) {
     console.error("[api/backup] POST", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 400 });

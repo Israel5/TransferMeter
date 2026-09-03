@@ -230,7 +230,10 @@ export async function exportAll(sb: SupabaseClient): Promise<Backup> {
  *  The owner in the file is ignored: rows are written to whoever is signed in,
  *  so a backup can be restored into a different account and cannot be used to
  *  write into somebody else's. */
-export async function importAll(sb: SupabaseClient, owner: string, backup: Backup) {
+export async function importAll(
+  sb: SupabaseClient, owner: string, backup: Backup,
+  opts: { replace?: boolean } = {},
+) {
   if (backup?.app !== "transfer-meter") throw new Error("That is not a Transfer Meter backup.");
   if (backup.version !== 1) throw new Error(`That backup is version ${backup.version}; this app reads version 1.`);
 
@@ -270,5 +273,32 @@ export async function importAll(sb: SupabaseClient, owner: string, backup: Backu
     }
   }
 
-  return { quotes, learned, settings: !!backup.settings?.data };
+  // Replacing is the other half of restoring: without it, junk added since the
+  // backup survives it -- and the quote numbering, which counts up from the
+  // highest number present, keeps counting from the junk.
+  let removed = 0;
+  if (opts.replace) {
+    const keep = new Set((backup.quotes ?? []).map((q) => q?.id).filter(Boolean) as string[]);
+    const { data: have } = await sb.from("quotes").select("id");
+    // Naming the rows to delete, rather than filtering by "everything except
+    // this list": a quote id is safe in a list and awkward inside a filter
+    // string, and the failure mode of getting that wrong is deleting the wrong
+    // rows silently.
+    const drop = (have ?? []).map((r: { id: string }) => r.id).filter((id) => !keep.has(id));
+    if (drop.length) {
+      const { error } = await sb.from("quotes").delete().in("id", drop);
+      if (error) throw new Error(error.message);
+      removed = drop.length;
+    }
+
+    const keepPairs = new Set((backup.learned ?? []).map((l) => l?.pair).filter(Boolean) as string[]);
+    const { data: hadPairs } = await sb.from("learned").select("pair").eq("owner", owner);
+    const dropPairs = (hadPairs ?? []).map((r: { pair: string }) => r.pair).filter((p) => !keepPairs.has(p));
+    if (dropPairs.length) {
+      const { error } = await sb.from("learned").delete().eq("owner", owner).in("pair", dropPairs);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  return { quotes, learned, removed, settings: !!backup.settings?.data };
 }
