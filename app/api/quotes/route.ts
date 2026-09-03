@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { userClient } from "@/lib/server/session";
 import { createQuote, updateQuote } from "@/lib/server/store";
-import { customerPayload } from "@/lib/message";
-import { waDigits } from "@/lib/whatsapp";
-import type { QuoteContent, Settings } from "@/lib/types";
+import type { QuoteContent } from "@/lib/types";
 
 /* Creating a quote, and revising one.
  *
@@ -11,7 +9,7 @@ import type { QuoteContent, Settings } from "@/lib/types";
  * called: it issues the id, and the number follows from it. Nothing here can
  * propose a number and hope it is free. */
 
-type Body = { content?: QuoteContent; settings?: Settings; id?: number };
+type Body = { content?: QuoteContent; id?: number };
 
 export async function POST(req: Request) {
   const me = await userClient();
@@ -22,23 +20,18 @@ export async function POST(req: Request) {
   catch { return NextResponse.json({ error: "Malformed request." }, { status: 400 }); }
 
   const content = body?.content;
-  const settings = body?.settings;
-  if (!content || typeof content !== "object" || !Array.isArray(content.trips) || !settings) {
+  if (!content || typeof content !== "object" || !Array.isArray(content.trips)) {
     return NextResponse.json({ error: "Malformed request." }, { status: 400 });
   }
 
   try {
-    const view = (q: Parameters<typeof customerPayload>[0]) =>
-      customerPayload(q, settings, (v: string) => waDigits(v, settings));
-
+    // One write. There used to be two: the stored customer copy needed a quote
+    // number that does not exist until the row does, so every save wrote, read
+    // back, and wrote again. Nothing is stored for the customer now.
     if (Number.isInteger(body.id) && (body.id as number) > 0) {
-      const saved = await updateQuote(me.sb, body.id as number, content);
-      return NextResponse.json(await updateQuote(me.sb, saved.id, content, view(saved)));
+      return NextResponse.json(await updateQuote(me.sb, body.id as number, content));
     }
-
-    const created = await createQuote(me.sb, me.owner, content);
-    // The customer's copy needs the number, which only exists once the row does.
-    return NextResponse.json(await updateQuote(me.sb, created.id, content, view(created)));
+    return NextResponse.json(await createQuote(me.sb, me.owner, content));
   } catch (e) {
     console.error("[api/quotes] POST", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

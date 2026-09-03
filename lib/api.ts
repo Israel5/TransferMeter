@@ -54,11 +54,9 @@ export async function push(state: AppState): Promise<Quote[] | null> {
 
 /** Save a quote and get it back as the database now holds it -- with its id,
  *  its number, and the customer's copy rebuilt. */
-export async function saveQuoteToServer(
-  content: unknown, settings: unknown, id?: number,
-): Promise<Quote> {
+export async function saveQuoteToServer(content: unknown, id?: number): Promise<Quote> {
   return call<Quote>("/api/quotes", {
-    method: "POST", body: JSON.stringify({ content, settings, ...(id ? { id } : {}) }),
+    method: "POST", body: JSON.stringify({ content, ...(id ? { id } : {}) }),
   });
 }
 

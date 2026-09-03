@@ -210,7 +210,7 @@ function useAppState() {
     if (!r.ok) { say(r.message); return null; }
     setStore("Backing up…");
     try {
-      const saved = await saveQuoteToServer(r.content, st.settings, r.editing?.id);
+      const saved = await saveQuoteToServer(r.content, r.editing?.id);
       setSt((prev) => withQuote(prev, saved));
       setStore("Work backed up");
       say(r.editing ? `Quote ${saved.quoteNo} updated.` : `Saved as ${saved.quoteNo}.`);

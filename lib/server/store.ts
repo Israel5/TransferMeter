@@ -30,7 +30,7 @@ const toQuote = (r: Row): Quote => ({
 
 /** Create one. The database issues the id, and the number follows from it. */
 export async function createQuote(
-  sb: SupabaseClient, owner: string, content: QuoteContent, customerView?: unknown,
+  sb: SupabaseClient, owner: string, content: QuoteContent,
 ): Promise<Quote> {
   const { data, error } = await sb
     .from("quotes")
@@ -41,7 +41,6 @@ export async function createQuote(
       // nothing; a second copy of a fact that already has a home is how the
       // status came to disagree with itself twice.
       data: { ...content, savedAt: new Date().toISOString() },
-      ...(customerView ? { customer_view: customerView } : {}),
     })
     .select(QUOTE_COLUMNS)
     .single();
@@ -51,11 +50,11 @@ export async function createQuote(
 
 /** Update one that already exists. */
 export async function updateQuote(
-  sb: SupabaseClient, id: number, content: QuoteContent, customerView?: unknown,
+  sb: SupabaseClient, id: number, content: QuoteContent,
 ): Promise<Quote> {
   const { data, error } = await sb
     .from("quotes")
-    .update({ data: content, ...(customerView ? { customer_view: customerView } : {}) })
+    .update({ data: content })
     .eq("id", id)
     .select(QUOTE_COLUMNS)
     .single();
@@ -172,24 +171,14 @@ export async function setQuoteStatus(sb: SupabaseClient, id: number, status: str
   if (error) throw new Error(error.message);
 }
 
-export async function push(
-  sb: SupabaseClient,
-  owner: string,
-  st: AppState,
-  viewOf?: (q: Quote) => unknown,
-) {
+export async function push(sb: SupabaseClient, owner: string, st: AppState) {
   // Only quotes that already exist. Creating one needs its id back, so it is
   // its own call rather than a side effect of saving everything.
   const existing = st.quotes.filter((q) => Number(q.id) > 0);
   let adopted: Quote[] | null = null;
   if (existing.length) {
     const merged = await withCustomerEdits(sb, existing);
-    const rows = merged.map((q) => ({
-      id: q.id,
-      owner,
-      data: contentOf(q),
-      ...(viewOf ? { customer_view: viewOf(q) } : {}),
-    }));
+    const rows = merged.map((q) => ({ id: q.id, owner, data: contentOf(q) }));
     const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });
     if (error) throw new Error(error.message);
     if (merged.some((q, i) => q !== existing[i])) adopted = merged;
@@ -250,7 +239,7 @@ export type Backup = {
   version: 1;
   exportedAt: string;
   quotes: { id: number; quote_no: string; status: string; share_token: string;
-            data: unknown; customer_view: unknown }[];
+            data: unknown }[];
   settings: { data: unknown; draft: unknown } | null;
   learned: { pair: string; km: number }[];
 };
@@ -259,7 +248,7 @@ export type Backup = {
  *  restored quote keeps the link already sent to its customer. */
 export async function exportAll(sb: SupabaseClient): Promise<Backup> {
   const [{ data: quotes, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
-    sb.from("quotes").select("id,quote_no,status,share_token,data,customer_view").order("id"),
+    sb.from("quotes").select("id,quote_no,status,share_token,data").order("id"),
     sb.from("settings").select("data,draft").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
@@ -301,7 +290,6 @@ export async function importAll(
         status: typeof q.status === "string" ? q.status : "draft",
         ...(typeof q.share_token === "string" && q.share_token ? { share_token: q.share_token } : {}),
         data: q.data,
-        customer_view: q.customer_view ?? null,
       }));
     if (rows.length) {
       const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });

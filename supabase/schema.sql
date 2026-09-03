@@ -30,7 +30,6 @@ create table if not exists public.quotes (
   data         jsonb  not null,
   share_token  text not null unique
                  default replace(gen_random_uuid()::text, '-', ''),
-  customer_view jsonb,          -- what the customer is shown, decided by the app
   answered_at  timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
@@ -233,9 +232,14 @@ create trigger claim_first_account
 -- Let a customer read and answer their own quote, with no table access.
 --
 -- What they may see is decided by the application when it saves, and stored in
--- customer_view: their legs, their totals, the driver's name. Never the home
--- address, the fuel cost, the tip or the notes. The database just serves that
--- column, so there is one place where the rule lives.
+-- What a customer's link opens: the quote as it stands, and the few settings
+-- their copy prints. Never the home address, the fuel cost, the tip or the
+-- notes. The app decides what to show from this, using the same function the
+-- PDF uses, so the page and the document cannot disagree.
+--
+-- It returns the quote, not a stored copy of it. A copy is only ever right at
+-- the moment it was written: change a price and every link already in a
+-- customer's hands went on showing the old one.
 
 create or replace function public.quote_by_token(token text)
 returns jsonb
@@ -243,7 +247,9 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare q public.quotes%rowtype;
+declare
+  q public.quotes%rowtype;
+  s jsonb;
 begin
   select * into q from public.quotes where share_token = token;
   if not found then return null; end if;
@@ -251,8 +257,23 @@ begin
   -- A draft has not been sent to anyone; it should not be readable yet.
   if q.status = 'draft' then return null; end if;
 
-  return coalesce(q.customer_view, '{}'::jsonb)
-       || jsonb_build_object('status', q.status, 'answered_at', q.answered_at);
+  -- Only what their copy prints. Never homeName, homeLat or homeLng, never the
+  -- fuel figures, never the price bands.
+  select jsonb_build_object(
+           'bizName',  coalesce(data->>'bizName', ''),
+           'bizPhone', coalesce(data->>'bizPhone', ''),
+           'bizWhats', coalesce(data->>'bizWhats', ''),
+           'seats',    coalesce((data->>'seats')::int, 7))
+    into s
+    from public.settings where owner = q.owner;
+
+  return jsonb_build_object(
+    'quote',       q.data,
+    'id',          q.id,
+    'quoteNo',     q.quote_no,
+    'status',      q.status,
+    'answered_at', q.answered_at,
+    'settings',    coalesce(s, '{}'::jsonb));
 end $$;
 
 drop function if exists public.answer_quote(text, text);
@@ -359,9 +380,6 @@ begin
                    'bags', coalesce(nullif(clean -> 'bags', '{}'::jsonb), data -> 'bags'),
                    'customerEditedAt', to_jsonb(now())
                  ),
-         -- The customer's copy has to agree with what they just typed.
-         customer_view = coalesce(customer_view, '{}'::jsonb)
-              || jsonb_build_object('xc', coalesce(customer_view -> 'xc', '{}'::jsonb) || clean),
          updated_at = now()
    where share_token = token
      and status = 'sent'          -- only while it is still awaiting an answer
@@ -371,7 +389,11 @@ begin
     raise exception 'that quote is not open for changes';
   end if;
 
-  return jsonb_build_object('xc', q.customer_view -> 'xc');
+  -- Read back from the quote itself, which is now the only copy of it.
+  return jsonb_build_object('xc', jsonb_build_object(
+    'pax',  coalesce(q.data -> 'pax',  '{}'::jsonb),
+    'gear', coalesce(q.data -> 'gear', '{}'::jsonb),
+    'bags', coalesce(q.data -> 'bags', '{}'::jsonb)));
 end $$;
 
 revoke all on function public.update_quote_counts(text, jsonb) from public;
@@ -400,3 +422,14 @@ end $$;
 
 revoke all on function public.sync_quote_ids() from public;
 grant execute on function public.sync_quote_ids() to authenticated;
+
+
+-- ---------------------------------------------------------------------------
+-- The stored copy of the customer's view, removed.
+--
+-- It was written whenever a quote was saved and read when a customer opened
+-- their link, so it was right at the moment of writing and only then. The view
+-- is shaped from the quote on every read now; there is nothing left to go
+-- stale. Safe to re-run: the column may already be gone.
+-- ---------------------------------------------------------------------------
+alter table public.quotes drop column if exists customer_view;

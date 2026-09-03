@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { anonClient } from "@/lib/server/session";
+import { customerPayload } from "@/lib/message";
+import { waDigits } from "@/lib/whatsapp";
+import { DEFAULTS } from "@/lib/types";
+import type { Quote, QuoteContent, Settings } from "@/lib/types";
 
 /* The customer's page, served without a key of any kind reaching their browser.
    Each of these calls a database function that guards itself: the token has to
@@ -7,13 +11,38 @@ import { anonClient } from "@/lib/server/session";
    counts are checked key by key. This route adds no privilege -- it only means
    the browser never has to hold one. */
 
+type Opened = {
+  quote: QuoteContent & { savedAt?: string };
+  id: number; quoteNo: string; status: string; answered_at: string | null;
+  settings: Partial<Settings>;
+};
+
 export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get("t") ?? "";
   if (!token) return NextResponse.json({ error: "No quote in that link." }, { status: 400 });
+
   const { data, error } = await anonClient().rpc("quote_by_token", { token });
   if (error) return NextResponse.json({ error: "That link could not be opened." }, { status: 400 });
   if (!data) return NextResponse.json({ error: "No quote in that link." }, { status: 404 });
-  return NextResponse.json(data);
+
+  // Shaped here, from the quote as it stands right now. It used to be shaped
+  // when the quote was saved and stored beside it, so a link already in a
+  // customer's hands kept showing the price it had at that moment.
+  const row = data as Opened;
+  const settings = { ...DEFAULTS, ...(row.settings ?? {}) } as Settings;
+  const quote = {
+    ...row.quote,
+    id: row.id,
+    quoteNo: row.quoteNo ?? "",
+    status: row.status,
+    savedAt: row.quote?.savedAt ?? "",
+  } as Quote;
+
+  return NextResponse.json({
+    ...customerPayload(quote, settings, (v: string) => waDigits(v, settings)),
+    status: row.status,
+    answered_at: row.answered_at,
+  });
 }
 
 export async function POST(req: Request) {

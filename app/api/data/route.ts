@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { userClient } from "@/lib/server/session";
 import { pull, push } from "@/lib/server/store";
-import { customerPayload } from "@/lib/message";
-import { waDigits } from "@/lib/whatsapp";
 import type { AppState } from "@/lib/state";
 
 /** A rejected or expired token reads as "sign in again", never as a fault. */
@@ -31,8 +29,7 @@ export async function PUT(req: Request) {
   }
 
   try {
-    const adopted = await push(me.sb, me.owner, state, (q) =>
-      customerPayload(q, state.settings, (v: string) => waDigits(v, state.settings)));
+    const adopted = await push(me.sb, me.owner, state);
     return NextResponse.json({ ok: true, adopted });
   } catch (e) {
     console.error("[api/data] PUT", e);
