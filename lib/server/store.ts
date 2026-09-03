@@ -81,12 +81,14 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
     learned,
     // The token lives on the row, not in the snapshot: it addresses the quote
     // for a customer and should not travel inside exported data.
-    // Newest first, by the date stored in the quote. Not by the order the rows
-    // sit in: a restore rewrites those, and then insertion order means nothing.
+    // Newest first, by id. The id is the order they were created in, it is
+    // the number on the quote, it survives a restore, and unlike a date
+    // inside the blob it cannot be missing -- one quote without a savedAt was
+    // enough to drop it to the bottom of the list.
     quotes: (rows ?? [])
       .filter((r: Row) => r?.data)
       .map(toQuote)
-      .sort((a, b) => String(b.savedAt ?? "").localeCompare(String(a.savedAt ?? ""))),
+      .sort((a, b) => b.id - a.id),
   };
 }
 
