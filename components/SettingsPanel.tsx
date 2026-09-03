@@ -47,8 +47,7 @@ export function SettingsPanel({
   );
 
   return (
-    <details className="settings">
-      <summary><span className="label">Car, fuel &amp; price bands</span></summary>
+    <section className="settings open">
       <div className="settings-body">
         <div className="subhead label">Your details (shown on the PDF)</div>
         <div className="fields">
@@ -121,6 +120,6 @@ export function SettingsPanel({
           <button className="btn" type="button" onClick={onClearLearned}>Forget corrected distances</button>
         </div>
       </div>
-    </details>
+    </section>
   );
 }

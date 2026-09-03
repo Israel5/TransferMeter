@@ -20,7 +20,7 @@ import type { Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
   const [st, setSt] = useState<AppState>(initialState);
-  const [view, setView] = useState<"list" | "quote" | "calendar">("list");
+  const [view, setView] = useState<"list" | "quote" | "calendar" | "settings">("list");
   const [signedIn, setSignedIn] = useState(false);
   const [booted, setBooted] = useState(false);
   const live = true;   // the Maps proxy is always there
@@ -357,8 +357,12 @@ export default function Home() {
         <p className="tagline">Route, fuel and fare</p>
         <span className="top-spacer" />
         <div className="viewswitch">
-          <button type="button" aria-pressed={view !== "calendar"} onClick={() => setView("list")}>Trips</button>
-          <button type="button" aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Calendar</button>
+          <button type="button" aria-pressed={view === "list" || view === "quote"}
+                  onClick={() => setView("list")}>Trips</button>
+          <button type="button" aria-pressed={view === "calendar"}
+                  onClick={() => setView("calendar")}>Calendar</button>
+          <button type="button" aria-pressed={view === "settings"}
+                  onClick={() => setView("settings")}>Settings</button>
         </div>
         <span className={"mode" + (store === "Synced" ? " live" : "")}><span className="dot" />{store}</span>
         <span className={"mode" + (live ? " live" : "")}><span className="dot" />{live ? "Google live" : "Estimates"}</span>
@@ -387,7 +391,8 @@ export default function Home() {
 
       {view === "calendar" && <Calendar quotes={st.quotes} settings={st.settings} onPatch={patchQuote} />}
 
-      <SettingsPanel settings={st.settings} learnedCount={Object.keys(st.learned).length}
+      {view === "settings" && (
+        <SettingsPanel settings={st.settings} learnedCount={Object.keys(st.learned).length}
                      quotes={st.quotes}
                      onChange={(patch) => set({ settings: { ...st.settings, ...patch } })}
                      onClearLearned={() => {
@@ -397,6 +402,7 @@ export default function Home() {
                            .catch(() => say("Those distances could not be forgotten — they will return on reload."));
                        }
                      }} />
+      )}
     </div>
   );
 }

@@ -638,19 +638,13 @@ a.link:hover{text-decoration:underline}
 }
 
 /* ---------- settings ---------- */
-details.settings{margin-top:18px}
-details.settings > summary{
-  cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;
-  padding:12px 14px;background:var(--surface);border:1px solid var(--line);
-  border-radius:12px;box-shadow:var(--shadow);
-}
-details.settings[open] > summary{border-radius:12px 12px 0 0;border-bottom:0}
-details.settings > summary::-webkit-details-marker{display:none}
-details.settings > summary::after{content:"▾";margin-left:auto;color:var(--muted);transition:transform .15s ease}
-details.settings[open] > summary::after{transform:rotate(180deg)}
+/* Its own page now. It used to sit collapsed under every screen, including a
+   quote being written, which put the things you set once a year beside the
+   thing you do every day. */
+.settings{margin-top:18px}
 .settings-body{
-  background:var(--surface);border:1px solid var(--line);border-top:1px solid var(--line);
-  border-radius:0 0 12px 12px;padding:14px;box-shadow:var(--shadow);
+  background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:16px;box-shadow:var(--shadow);
 }
 .fields{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
 .field{display:flex;flex-direction:column;gap:5px}
