@@ -267,14 +267,13 @@ export default function Home() {
     const q = await linkable(qIn);
     if (!q) return;
     const { link, isPrivate } = customerLinkFor(q);
-    if (isPrivate) {
-      say("This address only works on your own network — send from the deployed site.");
-      return;
-    }
     try {
       await navigator.clipboard.writeText(link);
-      markSent(q);
-      say("Link copied.");
+      // Only count it as sent when the link could actually reach someone.
+      if (!isPrivate) markSent(q);
+      say(isPrivate
+        ? "Copied — but this address only opens on this machine. Set your customer page address in Settings to copy public links."
+        : "Link copied.");
     } catch {
       window.prompt("Copy this link for your customer:", link);
     }
@@ -300,7 +299,7 @@ export default function Home() {
     if (!q) return;
     const { link, isPrivate } = customerLinkFor(q);
     if (isPrivate) {
-      say("This address only works on your own network — send from the deployed site.");
+      say("Not from here — this link only opens on this machine. Use Copy link to try it, or set your customer page address in Settings.");
       return;
     }
 
