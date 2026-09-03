@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fmt, dur, scheduleFor } from "@/lib/quote";
+import { fmt, dur, scheduleFor, shortDay } from "@/lib/quote";
 import { customerEnds } from "@/lib/reminders";
 import { waPretty } from "@/lib/whatsapp";
 import type { Lang, Quote, SavedTrip, Settings, Trip } from "@/lib/types";
@@ -32,6 +32,38 @@ export function isoDay(offset = 0) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Trips you have already driven and have not been paid for.
+ *
+ *  Only ones whose day has passed: a booking next month is work in the diary,
+ *  not a debt, and mixing the two turns a number you should act on into one
+ *  you learn to ignore. Oldest first, because that is the one to ask about.
+ */
+export function owedRuns(quotes: Quote[], s: Settings, learned: Record<string, number>): Run[] {
+  const today = isoDay(0);
+  const out: Run[] = [];
+  (quotes ?? []).forEach((q) => {
+    if ((q.status ?? "draft") !== "approved") return;
+    (q.trips ?? []).forEach((trip, legIndex) => {
+      if (!trip.date || trip.date >= today || trip.paid) return;
+      out.push({ quote: q, trip, legIndex, leave: null, pickup: null });
+    });
+  });
+  return out.sort((a, b) => (a.trip.date || "").localeCompare(b.trip.date || ""));
+}
+
+/** How long ago, in the words you would use out loud. */
+function daysAgo(date: string): string {
+  const [y, m, d] = String(date).split("-").map(Number);
+  if (!y) return "";
+  const then = new Date(y, m - 1, d), now = new Date();
+  const days = Math.round((now.setHours(0, 0, 0, 0) - then.setHours(0, 0, 0, 0)) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+  return `${Math.round(days / 30)} months ago`;
+}
+
 /** Every leg happening on one day, soonest first. A quote the customer has not
  *  answered still appears -- a trip tomorrow nobody confirmed is exactly the
  *  one you want to see. */
@@ -53,6 +85,25 @@ export function runsOn(quotes: Quote[], day: string, s: Settings, learned: Recor
     });
   });
   return out.sort((a, b) => (a.trip.time || "99:99").localeCompare(b.trip.time || "99:99"));
+}
+
+/** Pick the language and act, in one press. */
+function LangPick({
+  value, onPick, label,
+}: { value: Lang; onPick: (l: Lang) => void; label: string }) {
+  const [lang, setLang] = useState<Lang>(value ?? "pt");
+  return (
+    <>
+      <span className="dash-langs">
+        {(["pt", "en", "fr"] as const).map((c) => (
+          <button key={c} type="button" aria-pressed={lang === c}
+                  title={`Write in ${{ pt: "Portuguese", en: "English", fr: "French" }[c]}`}
+                  onClick={() => setLang(c)}>{c.toUpperCase()}</button>
+        ))}
+      </span>
+      <button type="button" className="dash-btn" onClick={() => onPick(lang)}>{label}</button>
+    </>
+  );
 }
 
 function Block({
@@ -109,22 +160,10 @@ function Block({
 
                 <div className="dash-acts">
                   {unanswered && <span className="dash-flag">not confirmed</span>}
-                  <span className="dash-langs">
-                    {(["pt", "en", "fr"] as const).map((c) => (
-                      <button key={c} type="button" aria-pressed={say === c}
-                              title={`Send in ${{ pt: "Portuguese", en: "English", fr: "French" }[c]}`}
-                              onClick={() => setLang((m) => ({ ...m, [key]: c }))}>
-                        {c.toUpperCase()}
-                      </button>
-                    ))}
-                  </span>
-                  <button type="button" className={"dash-btn" + (sent ? " done" : "")}
-                          onClick={() => onRemind(r, kind, say)}
-                          title={sent ? `Already sent ${new Date(sent).toLocaleString("en-CA")}` : undefined}>
-                    {kind === "before"
-                      ? (sent ? "Reminded" : "Remind")
-                      : (sent ? "Told them" : "On my way")}
-                  </button>
+                  <LangPick value={r.quote.lang} label={kind === "before"
+                              ? (sent ? "Reminded" : "Remind")
+                              : (sent ? "Told them" : "On my way")}
+                            onPick={(l) => onRemind(r, kind, l)} />
                 </div>
               </li>
             );
@@ -136,17 +175,63 @@ function Block({
 }
 
 export function Dashboard({
-  quotes, settings, learned, onRemind, onOpen,
+  quotes, settings, learned, onRemind, onNudge, onPaid, onOpen,
 }: {
   quotes: Quote[]; settings: Settings; learned: Record<string, number>;
   onRemind: (r: Run, kind: "before" | "onway", lang: Lang) => void;
+  onNudge: (r: Run, lang: Lang) => void;
+  onPaid: (r: Run) => void;
   onOpen: (id: number) => void;
 }) {
   const today = runsOn(quotes, isoDay(0), settings, learned);
   const tomorrow = runsOn(quotes, isoDay(1), settings, learned);
+  const owed = owedRuns(quotes, settings, learned);
+  const total = owed.reduce((n, r) => n + (Number(r.trip.price) || 0), 0);
 
   return (
     <div className="dash">
+      {owed.length > 0 && (
+        <section className="dash-block owed">
+          <div className="dash-head">
+            <h2>Owed</h2>
+            <span className="dash-count">
+              {`$${fmt(total, 0)} · ${owed.length} trip${owed.length === 1 ? "" : "s"} driven, not paid`}
+            </span>
+          </div>
+          <ul className="dash-list">
+            {owed.map((r) => {
+              const { from, to } = customerEnds(r.trip);
+              const key = `${r.quote.id}:${r.legIndex}`;
+              return (
+                <li key={key} className="dash-run">
+                  <div className="dash-when">
+                    <b>${fmt(r.trip.price ?? 0, 0)}</b>
+                    <span>{daysAgo(r.trip.date)}</span>
+                  </div>
+                  <div className="dash-who">
+                    <button type="button" className="dash-name" onClick={() => onOpen(r.quote.id)}>
+                      {r.quote.customer || "(no name)"}
+                    </button>
+                    <span className="dash-route">{from} → {to}</span>
+                    <span className="dash-meta">
+                      {[shortDay(r.trip.date), r.quote.quoteNo ? `#${r.quote.quoteNo}` : "",
+                        r.quote.contact ? waPretty(r.quote.contact, settings) : ""]
+                        .filter(Boolean).join("  ·  ")}
+                    </span>
+                  </div>
+                  <div className="dash-acts">
+                    <LangPick value={r.quote.lang} onPick={(l) => onNudge(r, l)} label="Ask" />
+                    <button type="button" className="dash-btn paid" onClick={() => onPaid(r)}>
+                      Mark paid
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       <Block title="Today" subtitle="tell them you've left"
              runs={today} kind="onway" settings={settings}
              onRemind={onRemind} onOpen={onOpen} />

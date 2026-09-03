@@ -11,12 +11,13 @@ import type { Lang, Quote, SavedTrip, Settings } from "./types";
  * everyone who never touched it.
  */
 
-export type MessageKind = "quote" | "reminder" | "onway";
+export type MessageKind = "quote" | "reminder" | "onway" | "owed";
 
 export const MESSAGE_KINDS: { key: MessageKind; label: string; hint: string }[] = [
   { key: "quote", label: "Sending a quote", hint: "When you send the price and the link." },
   { key: "reminder", label: "Day-before reminder", hint: "The reminder from the Today screen." },
   { key: "onway", label: "On my way", hint: "Sent as you leave to collect them." },
+  { key: "owed", label: "Asking to be paid", hint: "For a trip already driven and not yet paid." },
 ];
 
 /** Every value a message may use. The names are deliberately plain and the
@@ -176,7 +177,40 @@ Les détails de votre trajet : {{link}}
 
 — {{business}}`,
   },
+  owed: {
+    pt: `Olá {{first_name}}!
+
+Tudo bem? Passando só pra lembrar do transfer de {{date}}, {{from}} → {{to}}.
+
+Ficou {{price}}. Quando puder, é só me avisar.
+
+Obrigado!
+
+— {{business}}`,
+    en: `Hello {{first_name}}!
+
+Hope all is well. Just a note about the transfer on {{date}}, {{from}} → {{to}}.
+
+It came to {{price}}. Whenever suits you.
+
+Thank you!
+
+— {{business}}`,
+    fr: `Bonjour {{first_name}} !
+
+J'espère que tout va bien. Un petit mot au sujet du transfert du {{date}}, {{from}} → {{to}}.
+
+Le montant est de {{price}}. Quand cela vous convient.
+
+Merci !
+
+— {{business}}`,
+  },
 };
+
+/** Asking for money is the message most worth being able to reword: what
+ *  reads as friendly from one driver reads as pushy from another, and only you
+ *  know which of your customers is which. */
 
 /** The template in force: yours if you have written one, the default otherwise.
  *  An override that is blank counts as no override, so clearing the box is how

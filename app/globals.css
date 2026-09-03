@@ -645,6 +645,19 @@ a.who:hover{color:var(--accent);text-decoration:underline;text-underline-offset:
 /* ---------- today and tomorrow ----------------------------------------
    The daily screen: when to leave, who is waiting, and who has been told. */
 .dash{display:grid;gap:18px;margin-top:18px}
+/* Money already earned and not yet in hand. Amber, because it is a thing to
+   act on, not a thing that has gone wrong. */
+.dash-block.owed .dash-head{
+  background:color-mix(in srgb,var(--amber) 10%,transparent);
+  border-bottom-color:color-mix(in srgb,var(--amber) 30%,transparent);
+}
+.dash-block.owed .dash-head h2{color:var(--amber)}
+.dash-block.owed .dash-when b{color:var(--amber)}
+.dash-btn.paid{
+  background:transparent;color:var(--good);
+  border-color:color-mix(in srgb,var(--good) 45%,transparent);
+}
+.dash-btn.paid:hover{background:color-mix(in srgb,var(--good) 10%,transparent);filter:none}
 .dash-block{
   background:var(--surface);border:1px solid var(--line);border-radius:13px;
   box-shadow:var(--shadow);overflow:hidden;

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Editor } from "@/components/Editor";
 import { TripList } from "@/components/TripList";
 import { Calendar } from "@/components/Calendar";
-import { Dashboard, type Run } from "@/components/Dashboard";
+
 import { SettingsPanel } from "@/components/SettingsPanel";
 import {
   initialState, loadQuote, newQuote, saveQuote, withQuote,
@@ -18,6 +18,7 @@ import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
 import { reminderMessage } from "@/lib/reminders";
+import type { Run } from "@/components/Dashboard";
 import { buildMessage } from "@/lib/templates";
 import { currentSession, signOut, pull, push, saveQuoteToServer, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
 import type { Lang, Quote, Settings, Stop, Trip } from "@/lib/types";
@@ -356,6 +357,27 @@ function useAppState() {
     patchQuote(q.id, { trips });
   };
 
+  /** Ask, politely, about a trip already driven and not yet paid. */
+  const nudge = async (r: Run, lang: Lang) => {
+    const q = await linkable(r.quote);
+    if (!q) return;
+    const { link, isPrivate } = customerLinkFor(q);
+    const body = buildMessage("owed", q, r.trip, isPrivate ? "" : link, st.settings, lang);
+    const wa = waLink(q.contact, body, st.settings);
+    if (wa) window.open(wa, "_blank", "noopener");
+    else {
+      try { await navigator.clipboard.writeText(body); say("No WhatsApp for them — message copied instead."); }
+      catch { window.prompt("Copy this message:", body); }
+    }
+  };
+
+  /** Paid, from the day's screen, without opening the quote to say so. */
+  const markPaid = (r: Run) => {
+    const trips = (r.quote.trips ?? []).map((t, i) => i === r.legIndex ? { ...t, paid: true } : t);
+    patchQuote(r.quote.id, { trips });
+    say(`${r.quote.customer || "That trip"} marked paid.`);
+  };
+
   const sendQuote = async (qIn: Quote) => {
     const q = await linkable(qIn);
     if (!q) return;
@@ -383,7 +405,7 @@ function useAppState() {
     st, setSt, set, setTrip, live, booted, signedIn, store, flash, say,
     email, setEmail, password, setPassword, signInMsg, setSignInMsg,
     persist, persistNow, mapsLeg, mapsRoute,
-    saveNow, patchQuote, doDelete, savePdf, sendQuote, remind,
+    saveNow, patchQuote, nudge, markPaid, doDelete, savePdf, sendQuote, remind,
     copyLink, revokeLink, customerLinkFor, refresh,
   };
 }
