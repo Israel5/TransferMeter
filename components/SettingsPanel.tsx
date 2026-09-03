@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt, measuredAverage, toL100, toKmPerL } from "@/lib/quote";
+import { MessageEditor } from "./MessageEditor";
 import type { Quote, Settings } from "@/lib/types";
 
 const NUM: [keyof Settings, string, string][] = [
@@ -110,6 +111,10 @@ export function SettingsPanel({
 
         <div className="subhead label">Price bands</div>
         <div className="fields">{BANDS.map(([k, l]) => num(k, l))}</div>
+
+        <div className="subhead label">Messages to customers</div>
+        <MessageEditor settings={settings} quotes={quotes}
+                       onChange={(templates) => onChange({ templates })} />
 
         <div className="subhead label">Learned distances</div>
         <p className="note">

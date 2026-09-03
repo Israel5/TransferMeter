@@ -42,6 +42,10 @@ export type Settings = {
   avgSpeed: number; waitPerStop: number; seats: number; leaveBuffer: number;
   countryCode: string;
   t1max: number; t1: number; t2max: number; t2: number; t3: number;
+  /** Rewritten customer messages, by kind and language. Only what you have
+   *  actually changed is stored; anything absent uses the built-in wording, so
+   *  a better default still reaches you. */
+  templates?: Partial<Record<string, Partial<Record<Lang, string>>>>;
 };
 
 export type QuoteStatus = "draft" | "requested" | "sent" | "approved" | "declined";

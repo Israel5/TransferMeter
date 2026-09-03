@@ -707,6 +707,41 @@ a.link:hover{text-decoration:underline}
   .dash-acts{width:100%;justify-content:flex-end}
 }
 
+/* ---------- rewriting the customer's messages ---------- */
+.msgs{display:grid;gap:12px}
+.msg-pick{display:grid;gap:8px}
+.msg-kinds,.msg-langs{display:flex;gap:6px;flex-wrap:wrap}
+.msg-kinds button,.msg-langs button{
+  display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--muted);
+  border-radius:8px;padding:6px 11px;cursor:pointer;font:inherit;font-size:.84rem;
+}
+.msg-kinds button[aria-pressed="true"],.msg-langs button[aria-pressed="true"]{
+  background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;
+}
+/* A dot means this one has been rewritten. */
+.msg-kinds i,.msg-langs i{font-style:normal;font-size:1.1rem;line-height:0;color:var(--amber)}
+.msg-kinds button[aria-pressed="true"] i,.msg-langs button[aria-pressed="true"] i{color:#fff}
+.msg-box{
+  width:100%;border:1px solid var(--line-2);border-radius:9px;padding:12px;
+  background:var(--surface);color:var(--ink);
+  font-family:"IBM Plex Mono",monospace;font-size:.84rem;line-height:1.6;resize:vertical;
+}
+.msg-box:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+.msg-vars{display:flex;gap:5px;flex-wrap:wrap}
+.msg-vars button{
+  border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2);
+  border-radius:6px;padding:3px 7px;cursor:pointer;
+  font-family:"IBM Plex Mono",monospace;font-size:.73rem;
+}
+.msg-vars button:hover{border-color:var(--accent);color:var(--accent)}
+.msg-acts{display:flex;gap:8px;flex-wrap:wrap}
+.msg-preview{
+  margin:0;white-space:pre-wrap;word-break:break-word;
+  border:1px solid var(--line);border-radius:9px;padding:13px 15px;
+  background:var(--surface-2);font:inherit;font-size:.88rem;line-height:1.55;
+}
+
 /* ---------- settings ---------- */
 /* Its own page now. It used to sit collapsed under every screen, including a
    quote being written, which put the things you set once a year beside the

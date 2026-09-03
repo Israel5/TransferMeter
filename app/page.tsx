@@ -17,6 +17,7 @@ import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
 import { reminderMessage } from "@/lib/reminders";
+import { buildMessage } from "@/lib/templates";
 import { currentSession, signOut, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
 import type { Lang, Quote, Settings, Stop, Trip } from "@/lib/types";
 
@@ -320,12 +321,9 @@ export default function Home() {
   const sendQuote = async (qIn: Quote) => {
     const q = await linkable(qIn);
     if (!q) return;
-    const W = wordsFor(q.lang);
     const { link, isPrivate } = customerLinkFor(q);
-    const intro = { pt: "Segue o orçamento do seu transfer", en: "Here is your transfer quote",
-                    fr: "Voici le devis de votre transfert" }[q.lang] ?? "Here is your transfer quote";
-
-    const body = `${intro}${q.quoteNo ? ` (${W.no} ${q.quoteNo})` : ""}:\n${link}`;
+    // The wording is the driver's to change; see Settings → Messages.
+    const body = buildMessage("quote", q, (q.trips ?? [])[0], link, st.settings, q.lang);
 
     const wa = waLink(q.contact, body, st.settings);
     if (wa) {
