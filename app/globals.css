@@ -610,6 +610,8 @@ a.link:hover{text-decoration:underline}
 }
 .day-row .what{flex:1;min-width:0}
 .day-row .who{font-size:.92rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+a.who{color:var(--ink);text-decoration:none;display:block}
+a.who:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .day-row .route{font-size:.79rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .day-row{flex-wrap:wrap}
 .day-row .amt{

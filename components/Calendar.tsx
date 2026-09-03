@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { fmt, money, legCost, toL100, niceDate, shortName } from "@/lib/quote";
 import { waLink } from "@/lib/whatsapp";
