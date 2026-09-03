@@ -16,7 +16,7 @@ const clock = (d: Date) =>
   d.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 export function Editor({
-  st, live, set, setTrip, mapsLeg, mapsRoute, quoteText, onSave, onSend, onPdf, onCopyLink, onNewQuote, onBack, flash,
+  st, live, set, setTrip, mapsLeg, mapsRoute, quoteText, onSave, onDiscard, onSend, onPdf, onCopyLink, onNewQuote, onBack, flash,
 }: {
   st: AppState; live: boolean;
   set: (patch: Partial<AppState>) => void;
@@ -24,7 +24,8 @@ export function Editor({
   mapsLeg: (i: number) => string | null;
   mapsRoute: () => string | null;
   quoteText: string;
-  onSave: () => void; onSend: () => void; onPdf: () => void; onCopyLink: () => void;
+  onSave: () => void; onDiscard: () => void;
+  onSend: () => void; onPdf: () => void; onCopyLink: () => void;
   onNewQuote: () => void; onBack: () => void;
   flash: string;
 }) {
@@ -73,6 +74,14 @@ export function Editor({
         {dirty && <span className="unsaved">Not saved yet</span>}
         <button className={"btn" + (dirty ? " wants-saving" : "")} type="button"
                 onClick={onSave}>{dirty ? "Save changes" : "Saved"}</button>
+        {/* Editing survives a closed laptop, which means what you see on
+            opening a quote may be work in progress rather than what is stored.
+            Keeping it is right; being unable to put it down is not. */}
+        {dirty && st.editingId != null && (
+          <button className="link discard" type="button" onClick={onDiscard}>
+            Discard changes
+          </button>
+        )}
       </div>
 
       <div className="grid">
@@ -271,6 +280,16 @@ export function Editor({
                 <button className="btn" type="button" onClick={onNewQuote}>New quote</button>
                 <span className="unit" role="status" aria-live="polite">{flash}</span>
               </div>
+
+              {/* These three save before they act, so a customer never gets a
+                  link to something that was never stored. That is right, and
+                  it is also the reason a price typed here reaches them without
+                  Save being pressed -- which should be said, not discovered. */}
+              <p className={"share-note" + (dirty ? " warn" : "")}>
+                {dirty
+                  ? "Send, Copy link and PDF will save this quote first — your customer gets what is on this screen now, not what the trips list shows."
+                  : "Send, Copy link and PDF save the quote first, so a customer never opens a link to something unsaved."}
+              </p>
             </div>
           </section>
         </div>

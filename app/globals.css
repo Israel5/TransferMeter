@@ -353,6 +353,20 @@ a.link:hover{text-decoration:underline}
 .signin .msg.good{color:var(--good)}
 .backbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 /* Ahead of what is stored. Amber, because it is a thing to do, not a fault. */
+.share-note{
+  margin:10px 0 0;font-size:.78rem;line-height:1.5;color:var(--muted);
+}
+.share-note.warn{
+  color:var(--amber);
+  border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);
+  background:color-mix(in srgb,var(--amber) 8%,transparent);
+  border-radius:9px;padding:9px 11px;
+}
+.link.discard{
+  border:0;background:none;padding:0;cursor:pointer;font:inherit;font-size:.8rem;
+  color:var(--muted);text-decoration:underline;text-underline-offset:3px;
+}
+.link.discard:hover{color:var(--bad)}
 .unsaved{
   flex:none;font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
   letter-spacing:.07em;font-size:.66rem;font-weight:600;white-space:nowrap;

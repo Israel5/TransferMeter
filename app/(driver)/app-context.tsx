@@ -51,7 +51,7 @@ function useAppState() {
   const [signedIn, setSignedIn] = useState(false);
   const [booted, setBooted] = useState(false);
   const live = true;   // the Maps proxy is always there
-  const [store, setStore] = useState("This browser");
+  const [store, setStore] = useState("Backing up…");
   const [flash, setFlash] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -71,8 +71,8 @@ function useAppState() {
         try {
           const remote = await pull();
           if (remote) setSt((prev) => ({ ...prev, ...remote } as AppState));
-          setStore("Synced");
-        } catch { setStore("Not saved"); }
+          setStore("Work backed up");
+        } catch { setStore("Backup failed"); }
       }
       setBooted(true);
     })();
@@ -84,18 +84,18 @@ function useAppState() {
   const persistNow = useCallback(async (next: AppState) => {
     if (pushTimer.current) clearTimeout(pushTimer.current);
     if (!signedIn) return;
-    setStore("Saving…");
+    setStore("Backing up…");
     try {
       await push(next);
-      setStore("Synced");
-    } catch { setStore("Not saved"); throw new Error("Could not save that quote."); }
+      setStore("Work backed up");
+    } catch { setStore("Backup failed"); throw new Error("Could not save that quote."); }
   }, [signedIn]);
 
   const persist = useCallback((next: AppState) => {
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = setTimeout(async () => {
       if (signedIn) {
-        setStore("Saving…");
+        setStore("Backing up…");
         try {
           const adopted = await push(next);
           // A customer corrected their counts while this was open; the save
@@ -107,9 +107,9 @@ function useAppState() {
             }));
             say("A customer answered or updated their details — your list is up to date.");
           }
-          setStore("Synced");
+          setStore("Work backed up");
         }
-        catch (e) { setStore("Not saved"); }
+        catch (e) { setStore("Backup failed"); }
       }
     }, 600);
   }, [signedIn]);
@@ -198,8 +198,8 @@ function useAppState() {
     try {
       const remote = await pull();
       if (remote) setSt((prev) => ({ ...prev, ...remote } as AppState));
-      setStore("Synced");
-    } catch { setStore("Not saved"); }
+      setStore("Work backed up");
+    } catch { setStore("Backup failed"); }
   }, []);
 
   /* ---------- actions ---------- */
@@ -208,15 +208,15 @@ function useAppState() {
   const saveNow = async (): Promise<Quote | null> => {
     const r = saveQuote(st);
     if (!r.ok) { say(r.message); return null; }
-    setStore("Saving…");
+    setStore("Backing up…");
     try {
       const saved = await saveQuoteToServer(r.content, st.settings, r.editing?.id);
       setSt((prev) => withQuote(prev, saved));
-      setStore("Synced");
+      setStore("Work backed up");
       say(r.editing ? `Quote ${saved.quoteNo} updated.` : `Saved as ${saved.quoteNo}.`);
       return saved;
     } catch (e) {
-      setStore("Not saved");
+      setStore("Backup failed");
       say((e as Error).message);
       return null;
     }
@@ -233,7 +233,7 @@ function useAppState() {
     // nothing can undo an answer by accident and nothing can stop you undoing
     // one on purpose.
     if (patch.status && signedIn) {
-      setQuoteStatus(id, patch.status).catch(() => setStore("Not saved"));
+      setQuoteStatus(id, patch.status).catch(() => setStore("Backup failed"));
     }
   };
 
@@ -241,7 +241,7 @@ function useAppState() {
     setSt((prev) => { const next = { ...prev, quotes: prev.quotes.filter((q) => q.id !== id) }; persist(next); return next; });
     if (signedIn) {
       try { await removeQuote(id); }
-      catch { setStore("Not saved"); say("That quote could not be deleted — it will come back when you reload."); }
+      catch { setStore("Backup failed"); say("That quote could not be deleted — it will come back when you reload."); }
     }
   };
 

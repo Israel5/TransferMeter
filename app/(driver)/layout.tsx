@@ -115,7 +115,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <span className={"mode" + (store === "Synced" ? " live" : "")}><span className="dot" />{store}</span>
+        <span className={"mode" + (store === "Work backed up" ? " live" : "")}><span className="dot" />{store}</span>
         <span className={"mode" + (live ? " live" : "")}><span className="dot" />{live ? "Google live" : "Estimates"}</span>
       </header>
 

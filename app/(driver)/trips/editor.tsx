@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Editor } from "@/components/Editor";
 import { useApp } from "../app-context";
 import { draftMessage } from "@/lib/message";
+import { loadQuote } from "@/lib/state";
 import type { Quote } from "@/lib/types";
 
 /** The quote editor, shared by /trips/new and /trips/[id].
@@ -12,7 +13,7 @@ import type { Quote } from "@/lib/types";
  *  reload after that and you are still on the quote you were writing, which is
  *  the whole point of the page having one. */
 export function QuoteEditor() {
-  const { st, live, set, setTrip, mapsLeg, mapsRoute, flash,
+  const { st, setSt, persist, live, set, setTrip, mapsLeg, mapsRoute, flash,
           saveNow, savePdf, sendQuote, copyLink } = useApp();
   const router = useRouter();
 
@@ -31,6 +32,14 @@ export function QuoteEditor() {
             onSend={async () => { const q = settle(await saveNow()); if (q) await sendQuote(q); }}
             onPdf={async () => { const q = settle(await saveNow()); if (q) savePdf(q); }}
             onCopyLink={async () => { const q = settle(await saveNow()); if (q) await copyLink(q); }}
+            onDiscard={() => {
+              // Back to the quote as stored. Nothing else is touched, and a
+              // quote that was never saved has nothing to go back to.
+              if (st.editingId == null) return;
+              const next = loadQuote(st, st.editingId);
+              setSt(next);
+              persist(next);
+            }}
             onNewQuote={() => router.push("/trips/new")}
             onBack={() => router.push("/trips")}
             flash={flash} />
