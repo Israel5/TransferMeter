@@ -17,7 +17,7 @@ import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact, waDigits, waLink } from "@/lib/whatsapp";
 import { wordsFor } from "@/lib/words";
 import { reminderMessage } from "@/lib/reminders";
-import { currentSession, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
+import { currentSession, signOut, pull, push, setQuoteStatus, fetchShareToken, clearLearned, removeQuote, rotateShareToken, signIn } from "@/lib/api";
 import type { Lang, Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
@@ -434,6 +434,12 @@ export default function Home() {
                          clearLearned()
                            .catch(() => say("Those distances could not be forgotten — they will return on reload."));
                        }
+                     }}
+                     onSignOut={async () => {
+                       try { await signOut(); } catch { /* the cookie goes either way */ }
+                       // A full reload, so nothing of the signed-in screen is
+                       // left behind in memory after the session is gone.
+                       location.reload();
                      }} />
       )}
     </div>

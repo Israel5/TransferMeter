@@ -17,11 +17,12 @@ const BANDS: [keyof Settings, string][] = [
 ];
 
 export function SettingsPanel({
-  settings, learnedCount, quotes, onChange, onClearLearned,
+  settings, learnedCount, quotes, onChange, onClearLearned, onSignOut,
 }: {
   settings: Settings; learnedCount: number; quotes: Quote[];
   onChange: (patch: Partial<Settings>) => void;
   onClearLearned: () => void;
+  onSignOut: () => void;
 }) {
   // What the car has really been doing, from the rides you measured.
   const real = measuredAverage(quotes);
@@ -118,6 +119,15 @@ export function SettingsPanel({
         </p>
         <div className="route-actions" style={{ borderTop: 0, paddingTop: 4 }}>
           <button className="btn" type="button" onClick={onClearLearned}>Forget corrected distances</button>
+        </div>
+
+        <div className="subhead label">This device</div>
+        <p className="note">
+          Signing out clears the session on this browser only. Your trips stay where they are,
+          and any customer link you have already sent keeps working.
+        </p>
+        <div className="route-actions" style={{ borderTop: 0, paddingTop: 4 }}>
+          <button className="btn danger" type="button" onClick={onSignOut}>Sign out</button>
         </div>
       </div>
     </section>
