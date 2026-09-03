@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { fmt, money, dur, grandTotals, orderedBands, tripTotals } from "@/lib/quote";
 import type { Settings, Trip } from "@/lib/types";
 
@@ -17,6 +18,12 @@ export function Meter({
   const bands = orderedBands(settings).map((b) => b.price);
   const override = trip.priceOverride;
   const isCustom = override != null && !bands.includes(override);
+
+  // What is in the box while it is being typed in. Without this it empties
+  // itself the instant what you have typed equals a band price: type the 0 of
+  // 50 and the box clears, because 50 is a band.
+  const [typed, setTyped] = useState<string | null>(null);
+  const boxValue = typed ?? (isCustom ? String(override) : "");
 
   return (
     <div className="meter">
@@ -42,22 +49,30 @@ export function Meter({
       </div>
 
       <div className="tiers">
-        {bands.map((p) => {
+        {bands.map((p, i) => {
           const on = override == null ? p === t.band.price : p === override;
           return (
-            <button key={p} type="button" className="tier" aria-pressed={on}
+            <button key={`${i}:${p}`} type="button" className="tier" aria-pressed={on}
                     onClick={() => onPrice(override === p ? null : p)}>
               ${fmt(p, 0)}
             </button>
           );
         })}
-        <span className={"tier custom" + (isCustom ? " on" : "")}>
+        <span className={"tier custom" + (isCustom || typed ? " on" : "")}>
           <input type="number" min="0" step="1" inputMode="decimal" placeholder="other"
-                 aria-label="Custom price"
-                 value={isCustom ? String(override) : ""}
+                 aria-label="Your own price"
+                 value={boxValue}
                  onChange={(e) => {
-                   const v = parseFloat(e.target.value);
-                   onPrice(Number.isFinite(v) ? v : null);
+                   const raw = e.target.value;
+                   setTyped(raw);
+                   const v = parseFloat(raw);
+                   if (Number.isFinite(v) && v >= 0) onPrice(v);
+                 }}
+                 onBlur={() => {
+                   // Emptying the box means "use the band again" -- but only
+                   // once you have left it. Mid-edit it is just empty.
+                   if (typed !== null && typed.trim() === "") onPrice(null);
+                   setTyped(null);
                  }} />
         </span>
       </div>
