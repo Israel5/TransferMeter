@@ -22,7 +22,10 @@ import type { Lang, Quote, Settings, Stop, Trip } from "@/lib/types";
 
 export default function Home() {
   const [st, setSt] = useState<AppState>(initialState);
-  const [view, setView] = useState<"today" | "list" | "quote" | "calendar" | "settings">("list");
+  const [view, setView] = useState<"today" | "list" | "quote" | "calendar" | "settings">("today");
+  // Closing a quote should return you where you opened it from, not always to
+  // the trips list -- now that most days start on Today.
+  const [cameFrom, setCameFrom] = useState<"today" | "list">("today");
   const [signedIn, setSignedIn] = useState(false);
   const [booted, setBooted] = useState(false);
   const live = true;   // the Maps proxy is always there
@@ -397,10 +400,16 @@ export default function Home() {
 
       {view === "list" && (
         <TripList quotes={st.quotes} settings={st.settings}
-                  onOpen={(id) => { const next = loadQuote(st, id); setSt(next); persist(next); setView("quote"); }}
+                  onOpen={(id) => {
+                    const next = loadQuote(st, id); setSt(next); persist(next);
+                    setCameFrom("list"); setView("quote");
+                  }}
                   onDelete={doDelete} onPdf={savePdf} onSend={sendQuote} onCopyLink={copyLink}
                   onRevokeLink={revokeLink} onPatch={patchQuote}
-                  onNew={() => { const next = newQuote(st); setSt(next); persist(next); setView("quote"); }} />
+                  onNew={() => {
+                    const next = newQuote(st); setSt(next); persist(next);
+                    setCameFrom("list"); setView("quote");
+                  }} />
       )}
 
       {view === "quote" && (
@@ -412,14 +421,17 @@ export default function Home() {
                 onPdf={() => saveThen(async (q) => savePdf(q), false)}
                 onCopyLink={() => saveThen(copyLink)}
                 onNewQuote={() => { const next = newQuote(st); setSt(next); persist(next); }}
-                onBack={() => setView("list")}
+                onBack={() => setView(cameFrom)}
                 flash={flash} />
       )}
 
       {view === "today" && (
         <Dashboard quotes={st.quotes} settings={st.settings} learned={st.learned}
                    onRemind={remind}
-                   onOpen={(id) => { const next = loadQuote(st, id); setSt(next); persist(next); setView("quote"); }} />
+                   onOpen={(id) => {
+                     const next = loadQuote(st, id); setSt(next); persist(next);
+                     setCameFrom("today"); setView("quote");
+                   }} />
       )}
 
       {view === "calendar" && <Calendar quotes={st.quotes} settings={st.settings} onPatch={patchQuote} />}
