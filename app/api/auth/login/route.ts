@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { anonClient, writeSession } from "@/lib/server/session";
+import { isHuman } from "@/lib/server/human";
 
 /* Signing in happens here, so the password is posted to our own origin and the
    tokens it returns never enter the page. */
@@ -10,6 +11,15 @@ export async function POST(req: Request) {
   const email = typeof body.email === "string" ? body.email.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
   if (!email || !password) return NextResponse.json({ error: "Email and password, please." }, { status: 400 });
+
+  // Only where a challenge exists to pass. Requiring one that is not
+  // configured would lock the driver out of their own books to no one's
+  // benefit -- and the password is still required either way.
+  if (process.env.TURNSTILE_SECRET_KEY && process.env.QUOTE_REQUEST_SECRET) {
+    if (!(await isHuman())) {
+      return NextResponse.json({ error: "Complete the check and try again." }, { status: 403 });
+    }
+  }
 
   const { data, error } = await anonClient().auth.signInWithPassword({ email, password });
   if (error || !data.session) {

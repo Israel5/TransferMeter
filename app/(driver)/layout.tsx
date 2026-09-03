@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AppProvider, useApp } from "./app-context";
 import { signIn } from "@/lib/api";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /* Everything behind the sign-in shares this: one header, one copy of the
    state, and a URL that says where you are. */
@@ -20,12 +20,52 @@ function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [msg, setMsg] = useState("");
+  const [verified, setVerified] = useState(false);
+  const widget = useRef<HTMLDivElement | null>(null);
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  /* A password is the only thing standing between a stranger and every
+     customer's address and telephone number, and a form that answers a
+     password guess in 200ms will answer several million of them. The challenge
+     is what makes guessing cost something. */
+  useEffect(() => {
+    if (!siteKey || verified || !widget.current) return;
+    const el = widget.current;
+    let cancelled = false;
+
+    const draw = () => {
+      if (cancelled || !window.turnstile || el.childElementCount) return;
+      window.turnstile.render(el, {
+        sitekey: siteKey,
+        callback: async (t: string) => {
+          try {
+            const r = await fetch("/api/verify", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: t }),
+            });
+            setVerified(r.ok);
+          } catch { setVerified(false); }
+        },
+        "expired-callback": () => setVerified(false),
+        "error-callback": () => setVerified(false),
+      });
+    };
+
+    if (window.turnstile) { draw(); return; }
+    const sc = document.createElement("script");
+    sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    sc.async = true; sc.defer = true;
+    sc.onload = draw;
+    document.head.appendChild(sc);
+    return () => { cancelled = true; };
+  }, [siteKey, verified]);
 
   const go = async () => {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) {
       setMsg("That doesn't look like an email address."); return;
     }
     if (!password) { setMsg("Enter your password."); return; }
+    if (siteKey && !verified) { setMsg("Wait for the check above to pass."); return; }
     setMsg("Signing in…");
     try {
       await signIn(email.trim(), password);
@@ -45,7 +85,9 @@ function SignIn() {
         <input type="password" autoComplete="current-password" placeholder="Password"
                value={password} onChange={(e) => setPassword(e.target.value)}
                onKeyDown={(e) => { if (e.key === "Enter") go(); }} />
-        <button className="btn primary" type="button" onClick={go}>Sign in</button>
+        {siteKey && <div ref={widget} className="signin-check" />}
+        <button className="btn primary" type="button" disabled={!!siteKey && !verified}
+                onClick={go}>Sign in</button>
         <p className={"msg" + (msg ? " bad" : "")}>{msg}</p>
       </div>
     </div>
