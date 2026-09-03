@@ -17,19 +17,23 @@ export async function POST(req: Request) {
   const formSecret = process.env.QUOTE_REQUEST_SECRET;
   const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
 
-  if (!url || !anon || !formSecret) {
+  // Fail closed, but never silently: the log says which one is absent, because
+  // "not set up yet" on a site you believe you configured is a dead end.
+  const missing = [
+    !url && "SUPABASE_URL",
+    !anon && "SUPABASE_ANON_KEY",
+    !formSecret && "QUOTE_REQUEST_SECRET",
+    !turnstileSecret && "TURNSTILE_SECRET_KEY",
+  ].filter(Boolean);
+  if (missing.length) {
+    console.error("[api/request] refusing: missing", missing.join(", "),
+                  "-- env changes need a redeploy to reach a running function");
     return NextResponse.json({ error: "This site is not set up to take requests yet." }, { status: 503 });
   }
 
   let body: { payload?: unknown; token?: unknown };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Malformed request." }, { status: 400 }); }
-
-  // A missing Turnstile secret must fail closed. Treating it as "no check
-  // needed" would leave the form wide open the moment the variable is dropped.
-  if (!turnstileSecret) {
-    return NextResponse.json({ error: "This site is not set up to take requests yet." }, { status: 503 });
-  }
 
   const token = typeof body.token === "string" ? body.token : "";
   if (!token) {
