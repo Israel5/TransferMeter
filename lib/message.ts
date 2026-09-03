@@ -49,6 +49,9 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
     p: (s.bizPhone ?? "").trim(),
     w: waDigits(s.bizWhats) || waDigits(s.bizPhone) || "",
     n: q.quoteNo ?? "", c: q.customer ?? "", l: q.lang,
+    // The date the quote was made, which its document is dated with. Without
+    // it a PDF downloaded next month claims to have been written next month.
+    savedAt: q.savedAt ?? "",
     t: (q.trips ?? []).map((t) => {
       // The full journey, with my own address shown as its role rather than
       // its street, so the distance behind the price is visible.
