@@ -5,10 +5,12 @@ import { fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/api";
 import { buildPDF } from "@/lib/pdf";
 import { slugify } from "@/lib/quote";
 
-/* What a customer sees. The link carries only a token; everything on the page
-   comes from the row it unlocks, so a price changed after sending is the price
-   they read. The driver's own address is never in it — their stops arrive
-   already named by the part they play in the journey. */
+/* What a customer sees.
+ *
+ * The address is /quote/<token> and the token is the whole of it: everything
+ * here comes from the row it unlocks, so a price changed after sending is the
+ * price they read. The driver's own address is never in it -- their stops
+ * arrive already named by the part they play in the journey. */
 
 type Leg = {
   k: string; d: string; h: string; s: string[]; m: number[];
