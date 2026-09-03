@@ -1134,9 +1134,22 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .rq-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .rq-field{display:flex;flex-direction:column;gap:5px}
 .rq-field.wide{grid-column:1/-1}
-.rq-field span{
+.rq-field > span{
   font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
   font-size:.7rem;font-weight:600;color:var(--muted);
+}
+/* Label on the left, the choice of how to be reached on the right, one line. */
+.rq-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.rq-switch{display:inline-flex;align-items:baseline;gap:9px;flex:none}
+.rq-switch button{
+  border:0;background:none;padding:0;cursor:pointer;font:inherit;
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.7rem;font-weight:600;color:var(--muted);
+  text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line-2);
+}
+.rq-switch button:hover{color:var(--ink)}
+.rq-switch button[aria-pressed="true"]{
+  color:var(--accent);text-decoration-color:var(--accent);
 }
 .rq-field input{
   border:1px solid var(--line-2);border-radius:9px;padding:10px 11px;
@@ -1153,12 +1166,6 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .rq-note:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
 /* Phone or username, and the country picker that comes with the first. The
    library ships plain controls; these make them match the rest of the form. */
-.rq-toggle{display:inline-flex;gap:2px;margin-bottom:2px}
-.rq-toggle button{
-  border:1px solid var(--line-2);background:var(--surface);color:var(--muted);
-  border-radius:7px;padding:4px 10px;cursor:pointer;font:inherit;font-size:.78rem;font-weight:600;
-}
-.rq-toggle button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
 .rq-field .PhoneInput{
   display:flex;align-items:center;gap:8px;
   border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;background:var(--surface);

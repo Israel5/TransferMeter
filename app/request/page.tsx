@@ -262,13 +262,17 @@ export default function RequestQuote() {
               <input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
             </label>
             <div className="rq-field">
-              <span>{L.contact}</span>
-              <div className="rq-toggle" role="group" aria-label={L.how}>
-                <button type="button" aria-pressed={contactBy === "phone"}
-                        onClick={() => setContactBy("phone")}>{L.byPhone}</button>
-                <button type="button" aria-pressed={contactBy === "handle"}
-                        onClick={() => setContactBy("handle")}>{L.byHandle}</button>
-              </div>
+              {/* The choice sits on the label's own line, so this field is the
+                  same height as the one beside it and the two stay level. */}
+              <span className="rq-head">
+                {L.contact}
+                <span className="rq-switch" role="group" aria-label={L.how}>
+                  <button type="button" aria-pressed={contactBy === "phone"}
+                          onClick={() => setContactBy("phone")}>{L.byPhone}</button>
+                  <button type="button" aria-pressed={contactBy === "handle"}
+                          onClick={() => setContactBy("handle")}>{L.byHandle}</button>
+                </span>
+              </span>
               {contactBy === "phone" ? (
                 <PhoneInput
                   international
