@@ -5,6 +5,18 @@ const config: NextConfig = {
   // safe to repeat shows itself here rather than in front of a customer. It is
   // why a page load hits /api twice locally and once in production.
   reactStrictMode: true,
+
+  async headers() {
+    return [{
+      // A customer's link carries their token in the path, so it is now
+      // something a browser could pass on. Nothing leaves this page with it.
+      source: "/quote/:token*",
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow" },
+      ],
+    }];
+  },
 };
 
 export default config;

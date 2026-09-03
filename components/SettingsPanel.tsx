@@ -75,7 +75,7 @@ export function SettingsPanel({
           {text("bizPhone", "Phone or contact", "Printed on the PDF, free text")}
           {text("bizWhats", "Your WhatsApp number", "Where customers' answers are sent")}
           {text("customerPage", "Customer page address",
-                "Where the approve/decline page is hosted", { style: { gridColumn: "1/-1" } })}
+                "Where the approve page is hosted, e.g. https://…/quote", { style: { gridColumn: "1/-1" } })}
         </div>
 
         <div className="subhead label">Your address (private)</div>

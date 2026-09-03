@@ -270,7 +270,7 @@ function useAppState() {
     const isPrivate = /^https?:\/\/(localhost|127\.|0\.0\.0\.0|\[::1\]|192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(base);
     // Without a token the link opens an empty page. Better to say so than to
     // hand over an address that quietly leads nowhere.
-    return { link: `${base}#t=${q.shareToken ?? ""}`, isPrivate, usable: !!q.shareToken };
+    return { link: `${base}/${q.shareToken ?? ""}`, isPrivate, usable: !!q.shareToken };
   };
 
   /** The quote as the database knows it, with the token its link needs. Saves

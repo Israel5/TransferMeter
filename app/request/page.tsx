@@ -203,7 +203,7 @@ export default function RequestQuote() {
         window.turnstile?.reset(); setToken("");
         return;
       }
-      setDone(said?.token ? `${location.origin}/quote#t=${said.token}` : "");
+      setDone(said?.token ? `${location.origin}/quote/${said.token}` : "");
     } catch {
       setError("That could not be sent. Please try again.");
     } finally {
