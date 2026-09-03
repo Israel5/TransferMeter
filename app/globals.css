@@ -544,12 +544,13 @@ a.link:hover{text-decoration:underline}
 
 /* ---------- view switch ---------- */
 .viewswitch{display:flex;gap:4px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px}
-.viewswitch button{
+.viewswitch a{text-decoration:none;display:inline-flex;align-items:center}
+.viewswitch a,.viewswitch button{
   background:transparent;border:0;border-radius:7px;cursor:pointer;
   font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
   font-size:.8rem;font-weight:600;color:var(--muted);padding:6px 14px;
 }
-.viewswitch button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+.viewswitch a[aria-current="page"],.viewswitch button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
 
 /* ---------- calendar ---------- */
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
