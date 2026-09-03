@@ -135,10 +135,13 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
   cap(LBL.to, M, y);
   text(q.customer || "—", M, y-17, {size:14,bold:true});
   const legN=(q.trips||[]).length;
-  const paxKm   = (q.trips||[]).reduce((n:number,t:any)=>n+customerRoute(t.stops,t.legKm,W_).km, 0);
-  const paxMins = (q.trips||[]).reduce((n:number,t:any)=>n+(t.mins||0), 0);
+  // What the customer is in the car for, which is what these labels claim.
+  const paxKm   = (q.trips||[]).reduce((n:number,t:any)=>n+(Number(t.paxKm)||0), 0);
+  const paxMins = (q.trips||[]).reduce((n:number,t:any)=>n+(Number(t.paxMins)||0), 0);
+  // The whole loop, shown beside it because that is what the price is based on.
+  const drivenKm = (q.trips||[]).reduce((n:number,t:any)=>n+customerRoute(t.stops,t.legKm,W_).km, 0);
   cap(legN>1 ? legN+" "+W_.legs[1] : W_.oneway, W-M, y, {align:"right"});
-  text(fmt(paxKm,1)+" km", W-M, y-17, {size:11,color:GREY,align:"right"});
+  text(fmt(paxKm>0?paxKm:drivenKm,1)+" km", W-M, y-17, {size:11,color:GREY,align:"right"});
   y -= 40;
   line(M,y,W-M,y,FAINT); y -= 26;
 
@@ -176,7 +179,13 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
       }
       ry -= 17;
     });
-    text(fmt(view.km,1)+" km  \u00b7  "+dur(t.mins||0), labelX, bot+11, {size:8.5,color:GREY});
+    // Their journey first; the driven total after it, so neither is mistaken
+    // for the other.
+    text(Number(t.paxKm)>0
+           ? fmt(t.paxKm,1)+" km  \u00b7  "+dur(t.paxMins||0)
+             +"      ("+fmt(view.km,1)+" km "+W_.driven+")"
+           : fmt(view.km,1)+" km  \u00b7  "+dur(t.mins||0),
+         labelX, bot+11, {size:8.5,color:GREY});
     y = bot - 16;
   });
 
@@ -204,7 +213,7 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
   line(M,y,W-M,y,FAINT); y -= 20;
   if(legN>1){
     cap(LBL.dist, M, y);
-    text(fmt(paxKm,1)+" km", W-M, y, {size:9.8,align:"right"});
+    text(fmt(paxKm>0?paxKm:drivenKm,1)+" km", W-M, y, {size:9.8,align:"right"});
     y -= 16;
   }
   cap(LBL.time, M, y);

@@ -13,7 +13,7 @@ export type Words = {
 };
 
 export const WORDS: Record<Lang, Words> = {
-  pt:{adults:["adulto","adultos"],children:["criança","crianças"],infants:["bebê","bebês"],
+  pt:{driven:"no total",adults:["adulto","adultos"],children:["criança","crianças"],infants:["bebê","bebês"],
       infantSeat:["bebê conforto","bebês conforto"],carSeat:["cadeirinha","cadeirinhas"],booster:["booster","boosters"],
       checked:["mala","malas"],carry:["mala de mão","malas de mão"],backpack:["mochila","mochilas"],
       stroller:["carrinho de bebê","carrinhos de bebê"],crib:["berço portátil","berços portáteis"],other:["item","itens"],
@@ -22,7 +22,7 @@ export const WORDS: Record<Lang, Words> = {
       legs:["trecho","trechos"],oneway:"só ida",
       out:"IDA",ret:"VOLTA",leg:"TRECHO",total:"TOTAL",
       note:"Valor inclui a ida até você e o retorno. Válido por 7 dias."},
-  en:{adults:["adult","adults"],children:["child","children"],infants:["baby","babies"],
+  en:{driven:"driven",adults:["adult","adults"],children:["child","children"],infants:["baby","babies"],
       infantSeat:["infant seat","infant seats"],carSeat:["car seat","car seats"],booster:["booster","boosters"],
       checked:["suitcase","suitcases"],carry:["carry-on","carry-ons"],backpack:["backpack","backpacks"],
       stroller:["stroller","strollers"],crib:["travel crib","travel cribs"],other:["item","items"],
@@ -31,7 +31,7 @@ export const WORDS: Record<Lang, Words> = {
       legs:["leg","legs"],oneway:"one way",
       out:"OUTBOUND",ret:"RETURN",leg:"LEG",total:"TOTAL",
       note:"Price includes pickup and the return trip. Valid for 7 days."},
-  fr:{adults:["adulte","adultes"],children:["enfant","enfants"],infants:["bébé","bébés"],
+  fr:{driven:"au total",adults:["adulte","adultes"],children:["enfant","enfants"],infants:["bébé","bébés"],
       infantSeat:["siège bébé","sièges bébé"],carSeat:["siège d'auto","sièges d'auto"],booster:["siège d'appoint","sièges d'appoint"],
       checked:["valise","valises"],carry:["bagage à main","bagages à main"],backpack:["sac à dos","sacs à dos"],
       stroller:["poussette","poussettes"],crib:["lit parapluie","lits parapluie"],other:["article","articles"],
