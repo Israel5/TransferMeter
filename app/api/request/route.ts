@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     !formSecret && "QUOTE_REQUEST_SECRET",
     !turnstileSecret && "TURNSTILE_SECRET_KEY",
   ].filter(Boolean);
-  if (missing.length) {
+  if (missing.length || !url || !anon || !formSecret || !turnstileSecret) {
     console.error("[api/request] refusing: missing", missing.join(", "),
                   "-- env changes need a redeploy to reach a running function");
     return NextResponse.json({ error: "This site is not set up to take requests yet." }, { status: 503 });
