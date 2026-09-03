@@ -57,10 +57,16 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
     learned,
     // The token lives on the row, not in the snapshot: it addresses the quote
     // for a customer and should not travel inside exported data.
+    // Ordered by when each quote was first saved, not by the order the rows
+    // happen to sit in. A restore re-inserts rows and hands them fresh
+    // identity values, so insertion order stops meaning anything the moment
+    // one is used -- and the identity column is not worth resetting for a
+    // number nobody ever sees.
     quotes: dedupeQuotes(
       (rows ?? [])
         .map((r: any) => (r.data ? { ...r.data, status: r.status ?? "draft", shareToken: r.share_token } : null))
-        .filter(Boolean) as Quote[],
+        .filter(Boolean)
+        .sort((a: Quote, b: Quote) => String(b.savedAt ?? "").localeCompare(String(a.savedAt ?? ""))) as Quote[],
     ),
   };
 }
