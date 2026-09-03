@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { NumberField } from "./NumberField";
 import { fmt } from "@/lib/quote";
 import { DEFAULTS } from "@/lib/types";
 import type { Band } from "@/lib/types";
@@ -43,16 +43,10 @@ export function BandEditor({
   const rows = tidy(bands);
   const lastIndex = rows.length - 1;
 
-  // What is in a box while it is being typed in, which is not always a number:
-  // "" and "3" are both things on the way to 30.
-  const [typing, setTyping] = useState<Record<string, string>>({});
-  const shownValue = (key: string, actual: number | null) =>
-    typing[key] ?? (actual == null ? "" : String(actual));
-
   const set = (i: number, patch: Partial<Band>) =>
     onChange(rows.map((b, n) => (n === i ? { ...b, ...patch } : b)));
 
-  const settle = () => { setTyping({}); onChange(sorted(rows)); };
+  const settle = () => onChange(sorted(rows));
 
   const add = () => {
     const capped = rows.filter((b) => Number(b.upTo) > 0);
@@ -62,14 +56,10 @@ export function BandEditor({
       : Number(rows[lastIndex]?.price) || 0;
     // Above the furthest band that has a limit, which is usually where a new
     // one belongs. Type a smaller number and it drops into place.
-    setTyping({});
     onChange([...capped, { upTo: furthest + 30, price: dearest + 10 }, rows[lastIndex]]);
   };
 
-  const remove = (i: number) => {
-    setTyping({});
-    onChange(sorted(rows.filter((_, n) => n !== i)));
-  };
+  const remove = (i: number) => onChange(sorted(rows.filter((_, n) => n !== i)));
 
   let from = 0;
   return (
@@ -92,18 +82,15 @@ export function BandEditor({
                   <span className="band-anything">and beyond</span>
                 ) : (
                   <>
-                    <input type="number" min="1" step="1" inputMode="decimal"
-                           aria-label="Up to how many kilometres"
-                           value={shownValue(`km${i}`, b.upTo)}
-                           onChange={(e) => {
-                             const raw = e.target.value;
-                             setTyping((t) => ({ ...t, [`km${i}`]: raw }));
-                             const v = parseFloat(raw);
-                             // An empty box is mid-edit, not "no limit": the row
-                             // keeps both its limit and its place until you leave.
-                             if (Number.isFinite(v) && v > 0) set(i, { upTo: v });
-                           }}
-                           onBlur={settle} />
+                    {/* onChange edits in place, onCommit sorts. That split is
+                        what keeps a row from moving out from under the cursor. */}
+                    <NumberField
+                      min={1}
+                      ariaLabel="Up to how many kilometres"
+                      value={b.upTo}
+                      allowEmpty={false}
+                      onChange={(v) => set(i, { upTo: v })}
+                      onCommit={() => settle()} />
                     <span className="u">km</span>
                   </>
                 )}
@@ -111,16 +98,11 @@ export function BandEditor({
 
               <span className="band-price">
                 <span className="cur">$</span>
-                <input type="number" min="0" step="1" inputMode="decimal"
-                       aria-label="Price for this band"
-                       value={shownValue(`p${i}`, b.price)}
-                       onChange={(e) => {
-                         const raw = e.target.value;
-                         setTyping((t) => ({ ...t, [`p${i}`]: raw }));
-                         const v = parseFloat(raw);
-                         if (Number.isFinite(v) && v >= 0) set(i, { price: v });
-                       }}
-                       onBlur={() => setTyping({})} />
+                <NumberField
+                  ariaLabel="Price for this band"
+                  value={b.price}
+                  allowEmpty={false}
+                  onChange={(v) => set(i, { price: v })} />
               </span>
 
               {/* The open band cannot go: without it a long trip has no price. */}

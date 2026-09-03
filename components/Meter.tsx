@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { NumberField } from "./NumberField";
 import { fmt, money, dur, grandTotals, orderedBands, tripTotals } from "@/lib/quote";
 import type { Settings, Trip } from "@/lib/types";
 
@@ -18,12 +18,6 @@ export function Meter({
   const bands = orderedBands(settings).map((b) => b.price);
   const override = trip.priceOverride;
   const isCustom = override != null && !bands.includes(override);
-
-  // What is in the box while it is being typed in. Without this it empties
-  // itself the instant what you have typed equals a band price: type the 0 of
-  // 50 and the box clears, because 50 is a band.
-  const [typed, setTyped] = useState<string | null>(null);
-  const boxValue = typed ?? (isCustom ? String(override) : "");
 
   return (
     <div className="meter">
@@ -62,26 +56,19 @@ export function Meter({
 
       <div className="ownprice">
         <span className="label">Your own price</span>
-        <span className={"tier custom" + (isCustom || typed ? " on" : "")}>
-          <input type="number" min="0" step="1" inputMode="decimal" placeholder="other"
-                 aria-label="Your own price"
-                 value={boxValue}
-                 onChange={(e) => {
-                   const raw = e.target.value;
-                   setTyped(raw);
-                   const v = parseFloat(raw);
-                   if (Number.isFinite(v) && v >= 0) onPrice(v);
-                 }}
-                 onBlur={() => {
-                   // Emptying the box means "use the band again" -- but only
-                   // once you have left it. Mid-edit it is just empty.
-                   if (typed !== null && typed.trim() === "") onPrice(null);
-                   setTyped(null);
-                 }} />
+        <span className={"tier custom" + (isCustom ? " on" : "")}>
+          {/* Emptying it means "use the band again", which is why the empty
+              case is decided on leaving rather than on each keystroke. */}
+          <NumberField
+            placeholder="other"
+            ariaLabel="Your own price"
+            value={isCustom ? override : null}
+            onChange={(v) => onPrice(v)}
+            onCommit={(v) => { if (v == null) onPrice(null); }} />
         </span>
         {isCustom && (
           <button type="button" className="ownprice-clear"
-                  onClick={() => { setTyped(null); onPrice(null); }}>
+                  onClick={() => onPrice(null)}>
             use the band
           </button>
         )}

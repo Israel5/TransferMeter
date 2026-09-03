@@ -5,6 +5,7 @@ import { useState } from "react";
 import { MessageEditor } from "./MessageEditor";
 import { BackupPanel } from "./BackupPanel";
 import { BandEditor } from "./BandEditor";
+import { NumberField } from "./NumberField";
 import type { Quote, Settings } from "@/lib/types";
 
 const NUM: [keyof Settings, string, string][] = [
@@ -46,11 +47,13 @@ export function SettingsPanel({
   const num = (k: keyof Settings, label: string, hint?: string) => (
     <div className="field" key={k}>
       <label className="label" htmlFor={`s-${k}`}>{label}</label>
-      <input id={`s-${k}`} type="number" step="0.01" inputMode="decimal" value={String(settings[k] ?? "")}
-             onChange={(e) => {
-               const v = parseFloat(e.target.value);
-               if (Number.isFinite(v)) onChange({ [k]: v } as Partial<Settings>);
-             }} />
+      <NumberField
+        id={`s-${k}`}
+        step="0.01"
+        min={-180}
+        ariaLabel={label}
+        value={(settings[k] as number) ?? null}
+        onChange={(v) => onChange({ [k]: v } as Partial<Settings>)} />
       {hint && <span className="hint">{hint}</span>}
     </div>
   );
@@ -93,12 +96,13 @@ export function SettingsPanel({
         <div className="fields">
           <div className="field">
             <label className="label" htmlFor="s-l100">Consumption</label>
-            <input id="s-l100" type="number" step="0.1" inputMode="decimal"
-                   value={settings.kmPerL > 0 ? String(Math.round(toL100(settings.kmPerL) * 10) / 10) : ""}
-                   onChange={(e) => {
-                     const v = parseFloat(e.target.value);
-                     if (Number.isFinite(v) && v > 0) onChange({ kmPerL: toKmPerL(v) });
-                   }} />
+            <NumberField
+              id="s-l100"
+              step="0.1"
+              min={1}
+              ariaLabel="Consumption in litres per 100 km"
+              value={settings.kmPerL > 0 ? Math.round(toL100(settings.kmPerL) * 10) / 10 : null}
+              onChange={(v) => onChange({ kmPerL: toKmPerL(v) })} />
             <span className="hint">
               {`L/100 km, as the dash shows it — ${fmt(settings.kmPerL, 1)} km/L. Journey 3.6 ≈ 20`}
             </span>

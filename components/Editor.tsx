@@ -3,6 +3,7 @@
 import { StopRow, type Suggestion } from "./StopRow";
 import { CounterGroup } from "./Counters";
 import { Meter } from "./Meter";
+import { NumberField } from "./NumberField";
 import { fmt, dur, niceDate, legInfo, scheduleFor, tripTotals, shortName } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact } from "@/lib/whatsapp";
@@ -316,11 +317,19 @@ function StopRowWithLeg({
         <li className="leg">
           <span className="leg-rail" />
           <span className="leg-body">
-            <input className={"km" + (info.known ? "" : " unknown")} type="number" step="0.1" min="0"
-                   inputMode="decimal" aria-label={`Distance for leg ${i + 1}`} placeholder="set km"
-                   defaultValue={info.km != null ? info.km.toFixed(1) : ""}
-                   key={`${info.key}-${info.source}-${info.km ?? "x"}`}
-                   onBlur={(e) => onKm(parseFloat(e.target.value))} />
+              {/* Keyed by which leg it is, and nothing else. It used to include the
+                  distance and where the distance came from, so a Google answer
+                  arriving while you typed a correction remounted the box and
+                  threw away what you had written. */}
+              <NumberField
+                key={info.key}
+                className={"km" + (info.known ? "" : " unknown")}
+                step="0.1"
+                ariaLabel={`Distance for leg ${i + 1}`}
+                placeholder="set km"
+                value={info.km ?? null}
+                onChange={() => { /* committed on leaving the box, not per key */ }}
+                onCommit={(v) => onKm(v ?? NaN)} />
             <span className="unit">km</span>
             <span className={"chip" + (info.source === "saved" || info.source === "google" ? " saved"
                                      : info.source === "none" ? " warn" : "")}>

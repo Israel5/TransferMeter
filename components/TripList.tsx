@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { fmt, money, fuelUsed, quoteTotals, toL100, shortName, shortDay } from "@/lib/quote";
 import { owedOn, tipTotal } from "@/lib/state";
+import { NumberField } from "./NumberField";
 import { waLink, waHandle, waPretty } from "@/lib/whatsapp";
 import type { Actual, Quote, Settings } from "@/lib/types";
 
@@ -34,21 +35,22 @@ function FuelRow({
   const real = fuelUsed(actual, estKm, settings);
   // Quebec pumps advertise cents: 187.9 on the sign is $1.879 in this box.
   const looksLikeCents = (actual?.price ?? 0) > 10;
-  const set = (k: keyof Actual) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value.trim();
-    const v = parseFloat(raw);
+  const put = (k: keyof Actual, v: number | null) => {
     const next: Actual = { ...(actual ?? {}) };
-    if (raw === "" || !Number.isFinite(v) || v <= 0) delete next[k]; else next[k] = v;
+    if (v == null || v <= 0) delete next[k]; else next[k] = v;
     onChange(next);
   };
   const box = (k: keyof Actual, hint: number, unit: string, decimals: number,
                step: string, title: string) => (
     <span className={"fuel-box" + (actual?.[k] != null ? " has" : "")}>
-      <input type="number" min="0" step={step} inputMode="decimal"
-             placeholder={hint > 0 ? fmt(hint, decimals) : ""}
-             aria-label={title} title={title}
-             value={actual?.[k] != null ? String(actual[k]) : ""}
-             onChange={set(k)} />
+      <NumberField
+        value={actual?.[k] ?? null}
+        step={step}
+        placeholder={hint > 0 ? fmt(hint, decimals) : ""}
+        ariaLabel={title}
+        title={title}
+        onChange={(v) => put(k, v)}
+        onCommit={(v) => put(k, v)} />
       <span className="u">{unit}</span>
     </span>
   );
@@ -213,15 +215,14 @@ export function TripList({
                         </button>
                         <span className={"tip-field" + ((t.tip ?? 0) > 0 ? " has" : "")}>
                           <span className="cur">tip +$</span>
-                          <input type="number" min="0" step="1" inputMode="decimal" placeholder="0"
-                                 aria-label={`Tip for ${q.customer || "this leg"}`}
-                                 value={t.tip ? String(t.tip) : ""}
-                                 onChange={(e) => {
-                                   const v = parseFloat(e.target.value);
-                                   const trips = legs.map((x, i) =>
-                                     i === n ? { ...x, tip: Number.isFinite(v) && v > 0 ? v : 0 } : x);
-                                   onPatch(q.id, { trips });
-                                 }} />
+                          <NumberField
+                            value={t.tip || null}
+                            placeholder="0"
+                            ariaLabel={`Tip for ${q.customer || "this leg"}`}
+                            onChange={(v) => onPatch(q.id, {
+                              trips: legs.map((x, i) => (i === n ? { ...x, tip: v } : x)) })}
+                            onCommit={(v) => onPatch(q.id, {
+                              trips: legs.map((x, i) => (i === n ? { ...x, tip: v ?? 0 } : x)) })} />
                         </span>
                       </div>
                       <FuelRow

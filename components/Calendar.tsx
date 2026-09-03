@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { fmt, money, legCost, toL100, niceDate, shortName } from "@/lib/quote";
+import { NumberField } from "./NumberField";
 import { waLink } from "@/lib/whatsapp";
 import type { Quote, Settings } from "@/lib/types";
 
@@ -190,12 +191,12 @@ export function Calendar({
                           onClick={() => setLeg(l, { paid: !l.paid })}>{l.paid ? "Paid" : "Unpaid"}</button>
                   <span className={"tip-field" + (l.tip > 0 ? " has" : "")}>
                     <span className="cur">tip +$</span>
-                    <input type="number" min="0" step="1" inputMode="decimal" placeholder="0"
-                           aria-label={`Tip for ${l.customer}`} value={l.tip ? String(l.tip) : ""}
-                           onChange={(e) => {
-                             const v = parseFloat(e.target.value);
-                             setLeg(l, { tip: Number.isFinite(v) && v > 0 ? v : 0 });
-                           }} />
+                    <NumberField
+                      value={l.tip || null}
+                      placeholder="0"
+                      ariaLabel={`Tip for ${l.customer}`}
+                      onChange={(v) => setLeg(l, { tip: v })}
+                      onCommit={(v) => setLeg(l, { tip: v ?? 0 })} />
                   </span>
                   <span className="amt" style={l.paid ? undefined : { color: "var(--bad)" }}>
                     {`$${fmt(l.price, 0)}${l.tip > 0 ? ` +${fmt(l.tip, 0)}` : ""}`}
