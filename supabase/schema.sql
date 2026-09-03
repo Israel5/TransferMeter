@@ -81,8 +81,15 @@ create table if not exists public.settings (
   owner      uuid primary key references auth.users(id) on delete cascade,
   data       jsonb not null default '{}'::jsonb,     -- car, fuel, bands, your details
   draft      jsonb not null default '{}'::jsonb,     -- the trip open in the editor
+  -- Counts up on every write of `data`. A tab sends back the number it loaded,
+  -- and a write whose number is behind is refused rather than applied: an old
+  -- tab cannot quietly undo a setting changed somewhere else, which is how the
+  -- price bands and the road factor came back an hour after being changed.
+  version    bigint not null default 0,
   updated_at timestamptz not null default now()
 );
+
+alter table public.settings add column if not exists version bigint not null default 0;
 
 create table if not exists public.learned (
   owner uuid not null references auth.users(id) on delete cascade,

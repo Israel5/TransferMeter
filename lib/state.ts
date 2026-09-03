@@ -13,6 +13,9 @@ export type AppState = {
   editingId: number | null;
   quotes: Quote[];
   lang: Lang;
+  /** Which generation of the shared settings this tab loaded. Sent back on a
+   *  save so an older tab cannot write over a newer one. */
+  settingsVersion?: number;
 };
 
 export const homeStop = (s: Settings): Stop => ({ name: s.homeName, base: true });

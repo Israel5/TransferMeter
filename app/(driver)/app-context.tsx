@@ -86,7 +86,14 @@ function useAppState() {
     if (!signedIn) return;
     setStore("Backing up…");
     try {
-      await push(next);
+      const r = await push(next);
+      if (r.settingsRefused) {
+        // Another tab, or this one before a change made elsewhere. Take theirs.
+        await refresh();
+        say("Your settings had changed elsewhere, so the newer ones were kept.");
+      } else {
+        setSt((prev) => ({ ...prev, settingsVersion: r.settingsVersion }));
+      }
       setStore("Work backed up");
     } catch { setStore("Backup failed"); throw new Error("Could not save that quote."); }
   }, [signedIn]);
@@ -97,7 +104,14 @@ function useAppState() {
       if (signedIn) {
         setStore("Backing up…");
         try {
-          const adopted = await push(next);
+          const r = await push(next);
+          const adopted = r.adopted;
+          if (r.settingsRefused) {
+            await refresh();
+            say("Your settings had changed elsewhere, so the newer ones were kept.");
+          } else {
+            setSt((prev) => ({ ...prev, settingsVersion: r.settingsVersion }));
+          }
           // A customer corrected their counts while this was open; the save
           // kept their version, so the screen should show it too.
           if (adopted) {

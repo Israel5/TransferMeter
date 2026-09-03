@@ -95,7 +95,7 @@ function repair(data: Record<string, unknown>): Settings {
 export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null> {
   const [{ data: rows, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
     sb.from("quotes").select(QUOTE_COLUMNS),
-    sb.from("settings").select("data,draft").limit(1).maybeSingle(),
+    sb.from("settings").select("data,draft,version").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
   if (e1) throw new Error(e1.message);
@@ -106,6 +106,7 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
   const draft = (cfg?.draft ?? {}) as Partial<AppState>;
   return {
     ...draft,
+    settingsVersion: Number(cfg?.version ?? 0),
     settings: repair((cfg?.data ?? {}) as Record<string, unknown>),
     learned,
     // The token lives on the row, not in the snapshot: it addresses the quote
@@ -127,17 +128,19 @@ export async function pull(sb: SupabaseClient): Promise<Partial<AppState> | null
  *  older copy would quietly undo the correction. The customer is the authority
  *  on what they are carrying, so their numbers win and everything else stays
  *  the driver's. The status needs no such rule: it is not part of a save. */
-async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Quote[]> {
+async function withCustomerEdits(
+  sb: SupabaseClient, quotes: Quote[],
+): Promise<{ merged: Quote[]; stored: Map<number, Quote> }> {
   const ids = quotes.map((q) => q.id).filter(Boolean);
-  if (!ids.length) return quotes;
+  if (!ids.length) return { merged: quotes, stored: new Map() };
 
   const { data, error } = await sb.from("quotes").select("id,data").in("id", ids);
-  if (error || !data) return quotes;          // never block a save on this
+  if (error || !data) return { merged: quotes, stored: new Map() };   // never block a save
 
   const remote = new Map<number, Quote>();
   data.forEach((r: { id: number; data: Quote }) => { if (r?.data) remote.set(r.id, r.data); });
 
-  return quotes.map((q) => {
+  const merged = quotes.map((q) => {
     const r = remote.get(q.id);
     const theirs = r?.customerEditedAt;
     if (!theirs) return q;
@@ -145,6 +148,7 @@ async function withCustomerEdits(sb: SupabaseClient, quotes: Quote[]): Promise<Q
     return { ...q, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
              customerEditedAt: theirs };
   });
+  return { merged, stored: remote };
 }
 
 /** Forget every corrected distance. Explicit, because a save must never be
@@ -177,26 +181,48 @@ export async function push(sb: SupabaseClient, owner: string, st: AppState) {
   const existing = st.quotes.filter((q) => Number(q.id) > 0);
   let adopted: Quote[] | null = null;
   if (existing.length) {
-    const merged = await withCustomerEdits(sb, existing);
-    const rows = merged.map((q) => ({ id: q.id, owner, data: contentOf(q) }));
-    const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });
-    if (error) throw new Error(error.message);
+    const { merged, stored } = await withCustomerEdits(sb, existing);
+    // Only the ones that actually differ. Every keystroke used to rewrite every
+    // quote in the account.
+    const changed = merged.filter((q) => {
+      const was = stored.get(q.id);
+      return !was || JSON.stringify(contentOf(q)) !== JSON.stringify(was);
+    });
+    if (changed.length) {
+      const rows = changed.map((q) => ({ id: q.id, owner, data: contentOf(q) }));
+      const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+    }
     if (merged.some((q, i) => q !== existing[i])) adopted = merged;
   }
 
-  const { error: e2 } = await sb.from("settings").upsert(
-    {
-      owner,
-      data: st.settings,
-      draft: {
-        trips: st.trips, active: st.active, pax: st.pax, gear: st.gear, bags: st.bags,
-        customer: st.customer, contact: st.contact, notes: st.notes,
-        quoteNo: st.quoteNo, editingId: st.editingId, lang: st.lang,
-      },
-    },
-    { onConflict: "owner" },
-  );
+  // The draft is this tab's work in progress and nobody else writes it, so it
+  // goes every time. The settings are shared, so they go only when this tab
+  // actually holds the generation it is editing.
+  const draft = {
+    trips: st.trips, active: st.active, pax: st.pax, gear: st.gear, bags: st.bags,
+    customer: st.customer, contact: st.contact, notes: st.notes,
+    quoteNo: st.quoteNo, editingId: st.editingId, lang: st.lang,
+  };
+
+  const seen = Number(st.settingsVersion ?? 0);
+  const { data: rows, error: e2 } = await sb.from("settings")
+    .upsert({ owner, data: st.settings, draft, version: seen + 1 }, { onConflict: "owner" })
+    .gte("version", 0)
+    .lte("version", seen)          // refuse to write over a newer generation
+    .select("version");
   if (e2) throw new Error(e2.message);
+
+  let settingsVersion = seen + 1;
+  let settingsRefused = false;
+  if (!rows || rows.length === 0) {
+    // Someone -- another tab, or this one before a change made elsewhere --
+    // is behind. The draft still needs saving, so write that alone and tell
+    // the caller the settings did not go.
+    settingsRefused = true;
+    const { error: e2b } = await sb.from("settings").update({ draft }).eq("owner", owner);
+    if (e2b) throw new Error(e2b.message);
+  }
 
   // Deliberately no deletion here. Inferring it from an empty set would mean
   // that any load which failed to fetch them -- offline, a hiccup, a stale tab
@@ -209,7 +235,7 @@ export async function push(sb: SupabaseClient, owner: string, st: AppState) {
     if (e3) throw new Error(e3.message);
   }
 
-  return adopted;
+  return { adopted, settingsVersion, settingsRefused };
 }
 
 /** Deleting is deliberate; absence from a save never removes anything. */
@@ -249,7 +275,7 @@ export type Backup = {
 export async function exportAll(sb: SupabaseClient): Promise<Backup> {
   const [{ data: quotes, error: e1 }, { data: cfg }, { data: lrn }] = await Promise.all([
     sb.from("quotes").select("id,quote_no,status,share_token,data").order("id"),
-    sb.from("settings").select("data,draft").limit(1).maybeSingle(),
+    sb.from("settings").select("data,draft,version").limit(1).maybeSingle(),
     sb.from("learned").select("pair,km"),
   ]);
   if (e1) throw new Error(e1.message);

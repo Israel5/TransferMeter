@@ -29,8 +29,8 @@ export async function PUT(req: Request) {
   }
 
   try {
-    const adopted = await push(me.sb, me.owner, state);
-    return NextResponse.json({ ok: true, adopted });
+    const r = await push(me.sb, me.owner, state);
+    return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     console.error("[api/data] PUT", e);
     return NextResponse.json({ error: (e as Error).message }, { status: authish(e) ? 401 : 500 });

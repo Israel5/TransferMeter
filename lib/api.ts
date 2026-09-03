@@ -44,12 +44,17 @@ export async function pull(): Promise<Partial<AppState> | null> {
   return call<Partial<AppState> | null>("/api/data");
 }
 
-/** Returns the quotes whose customer-corrected counts were adopted, or null. */
-export async function push(state: AppState): Promise<Quote[] | null> {
-  const r = await call<{ adopted: Quote[] | null }>("/api/data", {
-    method: "PUT", body: JSON.stringify(state),
-  });
-  return r.adopted ?? null;
+export type PushResult = {
+  /** Quotes whose customer-corrected counts were adopted, or null. */
+  adopted: Quote[] | null;
+  /** The generation the settings now hold. */
+  settingsVersion: number;
+  /** True when this tab was behind and its settings were not written. */
+  settingsRefused: boolean;
+};
+
+export async function push(state: AppState): Promise<PushResult> {
+  return call<PushResult>("/api/data", { method: "PUT", body: JSON.stringify(state) });
 }
 
 /** Save a quote and get it back as the database now holds it -- with its id,
