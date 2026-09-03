@@ -110,23 +110,30 @@ export function SettingsPanel({
           {text("countryCode", "Default country code", "1 = Canada")}
         </div>
         {real && (
-          <p className="note">
-            {`Across the ${real.n} ride${real.n > 1 ? "s" : ""} you measured — ${fmt(real.km, 0)} km — the car actually did `}
-            <b>{`${fmt(real.l100, 1)} L/100 km`}</b>
-            {` (${fmt(real.kmPerL, 1)} km/L). `}
-            {Math.abs(drift) < 0.5
-              ? "That matches what you have set."
-              : `That is ${fmt(Math.abs(drift), 1)} L/100 km ${drift > 0 ? "thirstier" : "leaner"} than your setting, so untouched trips are costed ${drift > 0 ? "too cheaply" : "too dearly"}.`}
+          /* The figure first, the reading of it second, the button apart from
+             both. It was one long sentence with the button wedged inside it,
+             which wrapped somewhere around the middle of the page and left
+             the button stranded on a line of its own. */
+          <div className="measured">
+            <div className="measured-figure">
+              {fmt(real.l100, 1)}<small>L/100 km</small>
+            </div>
+            <div className="measured-read">
+              <b>{`${fmt(real.kmPerL, 1)} km/L`}</b>
+              {` over ${real.n} ride${real.n > 1 ? "s" : ""}, ${fmt(real.km, 0)} km measured.`}
+              <span>
+                {Math.abs(drift) < 0.5
+                  ? "That matches your setting."
+                  : `${fmt(Math.abs(drift), 1)} ${drift > 0 ? "thirstier" : "leaner"} than your setting, so untouched trips cost ${drift > 0 ? "more" : "less"} than you think.`}
+              </span>
+            </div>
             {Math.abs(drift) >= 0.5 && (
-              <>
-                {" "}
-                <button className="btn" type="button" style={{ marginLeft: 6 }}
-                        onClick={() => onChange({ kmPerL: real.kmPerL })}>
-                  {`Use ${fmt(real.l100, 1)} instead`}
-                </button>
-              </>
+              <button className="btn" type="button"
+                      onClick={() => onChange({ kmPerL: real.kmPerL })}>
+                {`Use ${fmt(real.l100, 1)}`}
+              </button>
             )}
-          </p>
+          </div>
         )}
 
       </>)}
