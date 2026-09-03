@@ -54,7 +54,7 @@ const ITEM: Record<string, Record<string, [string, string]>> = {
 
 const T = {
   pt: {
-    title: "Orçamento de transfer", forWhom: "Preparado para", quote: "Orçamento nº",
+    title: "Orçamento de transfer", forWhom: "Transfer de", quote: "Orçamento nº",
     out: "Ida", ret: "Volta", at: "às", total: "Total",
     pax: "Passageiros", gear: "Cadeirinhas", bags: "Bagagem",
     ask: "Tudo certo com o orçamento?", yes: "Aprovar", no: "Recusar",
@@ -74,7 +74,7 @@ const T = {
     notReady: "Ainda estou montando este orçamento pra você.",
   },
   en: {
-    title: "Transfer quote", forWhom: "Prepared for", quote: "Quote no.",
+    title: "Transfer quote", forWhom: "Transfer for", quote: "Quote no.",
     out: "Outbound", ret: "Return", at: "at", total: "Total",
     pax: "Passengers", gear: "Child seats", bags: "Luggage",
     ask: "Does this all look right?", yes: "Approve", no: "Decline",
@@ -94,7 +94,7 @@ const T = {
     notReady: "I'm still putting this quote together for you.",
   },
   fr: {
-    title: "Devis de transfert", forWhom: "Préparé pour", quote: "Devis nº",
+    title: "Devis de transfert", forWhom: "Transfert pour", quote: "Devis nº",
     out: "Aller", ret: "Retour", at: "à", total: "Total",
     pax: "Passagers", gear: "Sièges enfant", bags: "Bagages",
     ask: "Est-ce que tout est correct ?", yes: "Approuver", no: "Refuser",

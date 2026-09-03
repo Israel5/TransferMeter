@@ -103,10 +103,10 @@ export function buildPDF(q: Quote, S: Settings): Uint8Array {
   const W_=wordsFor(q.lang);
   const TITLE={pt:"ORÇAMENTO DE TRANSFER",en:"TRANSFER QUOTE",fr:"DEVIS DE TRANSFERT"}[q.lang] || "TRANSFER QUOTE";
   const LBL={
-    pt:{to:"Preparado para",dist:"Distância total",time:"Tempo estimado",stops:"Trajeto"},
-    en:{to:"Prepared for",dist:"Total distance",time:"Estimated time",stops:"Route"},
-    fr:{to:"Préparé pour",dist:"Distance totale",time:"Durée estimée",stops:"Trajet"}
-  }[q.lang] || {to:"Prepared for",dist:"Total distance",time:"Estimated time",stops:"Route"};
+    pt:{to:"Transfer de",dist:"Distância total",time:"Tempo estimado",stops:"Trajeto"},
+    en:{to:"Transfer for",dist:"Total distance",time:"Estimated time",stops:"Route"},
+    fr:{to:"Transfert pour",dist:"Distance totale",time:"Durée estimée",stops:"Trajet"}
+  }[q.lang] || {to:"Transfer for",dist:"Total distance",time:"Estimated time",stops:"Route"};
 
   /* ---- page furniture ---- */
   const BAND=98;
