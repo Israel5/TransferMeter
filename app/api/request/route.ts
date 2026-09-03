@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isHuman } from "@/lib/server/human";
 
 /* The only way a stranger's request reaches the database.
  *
@@ -8,8 +9,6 @@ import { NextResponse } from "next/server";
  * API, which is reachable from anywhere. The database then decides what may
  * actually be stored -- see request_quote, which keeps named fields only.
  */
-
-const TURNSTILE_VERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
 export async function POST(req: Request) {
   const url = process.env.SUPABASE_URL;
@@ -31,31 +30,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "This site is not set up to take requests yet." }, { status: 503 });
   }
 
-  let body: { payload?: unknown; token?: unknown };
+  let body: { payload?: unknown };
   try { body = await req.json(); }
   catch { return NextResponse.json({ error: "Malformed request." }, { status: 400 }); }
 
-  const token = typeof body.token === "string" ? body.token : "";
-  if (!token) {
-    return NextResponse.json({ error: "Please complete the verification." }, { status: 400 });
-  }
-
-  const form = new FormData();
-  form.append("secret", turnstileSecret);
-  form.append("response", token);
-  // Cloudflare uses this to spot one address firing many challenges.
-  const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0].trim();
-  if (ip) form.append("remoteip", ip);
-
-  let human = false;
-  try {
-    const r = await fetch(TURNSTILE_VERIFY, { method: "POST", body: form });
-    human = !!(await r.json())?.success;
-  } catch {
-    return NextResponse.json({ error: "Could not verify that just now. Please try again." }, { status: 502 });
-  }
-  if (!human) {
-    return NextResponse.json({ error: "That verification did not pass. Please try again." }, { status: 403 });
+  // The challenge was answered when the form opened and exchanged for a
+  // cookie; Cloudflare's token is single use and was spent doing it.
+  if (!(await isHuman())) {
+    return NextResponse.json({ error: "Please complete the verification." }, { status: 403 });
   }
 
   const payload = body.payload && typeof body.payload === "object" ? body.payload : {};

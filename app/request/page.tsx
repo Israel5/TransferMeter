@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 // full carrier and geocoding tables, which are several times larger and of no
 // use to a form that only needs a reachable number.
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/min";
+import { AddressField } from "./address-field";
 import "react-phone-number-input/style.css";
 
 /* The page a customer lands on to ask for a transfer.
@@ -32,6 +33,7 @@ const T = {
     needName: "Me diz seu nome, por favor.", needContact: "Preciso de um jeito de te responder.",
     needFrom: "Onde eu te busco?", needTo: "Pra onde você vai?",
     needHuman: "Confirme que você não é um robô.",
+    gateTitle: "Só um instante", gateSub: "Confirmando que você não é um robô. Costuma passar sozinho.",
     how: "Como falo com você?", byPhone: "Telefone", byHandle: "Usuário",
     badPhone: "Esse número parece incompleto.",
     adults: "Adultos", children: "Crianças", infants: "Bebês",
@@ -53,6 +55,7 @@ const T = {
     needName: "Please tell me your name.", needContact: "I need a way to reply to you.",
     needFrom: "Where should I collect you?", needTo: "Where are you going?",
     needHuman: "Please confirm you're not a robot.",
+    gateTitle: "One moment", gateSub: "Just checking you're not a robot. This usually passes on its own.",
     how: "How should I reach you?", byPhone: "Phone", byHandle: "Username",
     badPhone: "That number looks incomplete.",
     adults: "Adults", children: "Children", infants: "Babies",
@@ -74,6 +77,7 @@ const T = {
     needName: "Dites-moi votre nom.", needContact: "Il me faut un moyen de vous répondre.",
     needFrom: "Où dois-je venir vous chercher ?", needTo: "Où allez-vous ?",
     needHuman: "Confirmez que vous n'êtes pas un robot.",
+    gateTitle: "Un instant", gateSub: "Je vérifie que vous n'êtes pas un robot. Cela passe généralement tout seul.",
     how: "Comment vous joindre ?", byPhone: "Téléphone", byHandle: "Nom d'utilisateur",
     badPhone: "Ce numéro semble incomplet.",
     adults: "Adultes", children: "Enfants", infants: "Bébés",
@@ -122,7 +126,9 @@ export default function RequestQuote() {
     pax: { adults: 2, children: 0, infants: 0 }, gear: {}, bags: {},
   });
 
-  const [token, setToken] = useState("");
+  // Passing the challenge is exchanged for a short-lived cookie, so the
+  // address lookup below can be paid for without leaving it open to anyone.
+  const [verified, setVerified] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<string | null>(null);
@@ -138,7 +144,7 @@ export default function RequestQuote() {
   }, []);
 
   useEffect(() => {
-    if (!siteKey || !widget.current || done) return;
+    if (!siteKey || verified || !widget.current || done) return;
     const el = widget.current;
     let cancelled = false;
 
@@ -146,9 +152,17 @@ export default function RequestQuote() {
       if (cancelled || !window.turnstile || el.childElementCount) return;
       window.turnstile.render(el, {
         sitekey: siteKey,
-        callback: (t: string) => setToken(t),
-        "expired-callback": () => setToken(""),
-        "error-callback": () => setToken(""),
+        callback: async (t: string) => {
+          try {
+            const r = await fetch("/api/verify", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: t }),
+            });
+            setVerified(r.ok);
+          } catch { setVerified(false); }
+        },
+        "expired-callback": () => setVerified(false),
+        "error-callback": () => setVerified(false),
       });
     };
 
@@ -159,7 +173,7 @@ export default function RequestQuote() {
     s.onload = draw;
     document.head.appendChild(s);
     return () => { cancelled = true; };
-  }, [siteKey, done]);
+  }, [siteKey, verified, done]);
 
   const bump = (grp: string, key: string, by: number) =>
     setCounts((c) => {
@@ -177,7 +191,7 @@ export default function RequestQuote() {
     if (contactBy === "phone" && !isValidPhoneNumber(contact)) return setError(L.badPhone);
     if (!from.trim()) return setError(L.needFrom);
     if (!to.trim()) return setError(L.needTo);
-    if (siteKey && !token) return setError(L.needHuman);
+    if (siteKey && !verified) return setError(L.needHuman);
 
     setSending(true);
     try {
@@ -189,7 +203,6 @@ export default function RequestQuote() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token,
           payload: {
             customer: name.trim(), contact: contact.trim(), lang,
             note: note.trim(), trips,
@@ -200,7 +213,7 @@ export default function RequestQuote() {
       const said = await r.json().catch(() => null);
       if (!r.ok) {
         setError(said?.error || "That could not be sent. Please try again.");
-        window.turnstile?.reset(); setToken("");
+        window.turnstile?.reset(); setVerified(false);
         return;
       }
       setDone(said?.token ? `${location.origin}/quote/${said.token}` : "");
@@ -232,6 +245,36 @@ export default function RequestQuote() {
                 </button>
               </>
             ) : null}
+          </div>
+        </article>
+      </div>
+    );
+  }
+
+  // Until the challenge is passed there is no form: the address lookup behind
+  // it costs money on every keystroke, and a page that renders the fields and
+  // then refuses to help is worse than one that says what it is waiting for.
+  if (siteKey && !verified) {
+    return (
+      <div className="wrap cq">
+        <article className="cq-sheet">
+          <header className="cq-head">
+            <div className="cq-head-main">
+              <p className="cq-biz">{L.title}</p>
+              <p className="cq-biz-sub">{L.sub}</p>
+            </div>
+            <div className="rq-langs">
+              {(["pt", "en", "fr"] as const).map((c) => (
+                <button key={c} type="button" aria-pressed={lang === c}
+                        onClick={() => setLang(c)}>{c.toUpperCase()}</button>
+              ))}
+            </div>
+          </header>
+          <div className="cq-section rq-gate">
+            <h2 className="cq-h">{L.gateTitle}</h2>
+            <p className="note">{L.gateSub}</p>
+            <div ref={widget} className="rq-turnstile" />
+            {error && <p className="cq-warn">{error}</p>}
           </div>
         </article>
       </div>
@@ -295,14 +338,8 @@ export default function RequestQuote() {
         <section className="cq-section">
           <h2 className="cq-h">{L.trip}</h2>
           <div className="rq-fields">
-            <label className="rq-field wide">
-              <span>{L.from}</span>
-              <input value={from} onChange={(e) => setFrom(e.target.value)} autoComplete="off" />
-            </label>
-            <label className="rq-field wide">
-              <span>{L.to}</span>
-              <input value={to} onChange={(e) => setTo(e.target.value)} autoComplete="off" />
-            </label>
+            <AddressField label={L.from} value={from} onChange={setFrom} enabled={verified || !siteKey} />
+            <AddressField label={L.to} value={to} onChange={setTo} enabled={verified || !siteKey} />
             <label className="rq-field">
               <span>{L.date}</span>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -363,7 +400,6 @@ export default function RequestQuote() {
         </section>
 
         <div className="cq-section" style={{ borderBottom: 0 }}>
-          {siteKey && <div ref={widget} className="rq-turnstile" />}
           {error && <p className="cq-warn">{error}</p>}
           <button type="button" className="cq-btn solid rq-send" disabled={sending} onClick={submit}>
             {sending ? L.sending : L.send}

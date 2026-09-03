@@ -1166,6 +1166,7 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
    own padding -- 8px, 9px, 10px -- so no two fields beside each other were the
    same height. The measurements live here once. */
 .rq-field > input,
+.rq-combo > input,
 .rq-field .PhoneInput,
 .rq-handle{
   box-sizing:border-box;
@@ -1177,8 +1178,8 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
   padding:0 11px;
   font-size:.95rem;
 }
-.rq-field > input{color:var(--ink);font-family:inherit}
-.rq-field > input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
+.rq-field > input,.rq-combo > input{color:var(--ink);font-family:inherit}
+.rq-field > input:focus,.rq-combo > input:focus{outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus)}
 
 .rq-check{display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:.9rem}
 .rq-check input{width:18px;height:18px;accent-color:var(--accent)}
@@ -1210,6 +1211,24 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
   flex:1;min-width:0;padding:0;height:100%;
 }
 .rq-handle input:focus{outline:none}
+.rq-gate{border-bottom:0;text-align:center;padding-top:26px;padding-bottom:30px}
+.rq-gate .cq-h{justify-content:center;margin-bottom:8px}
+.rq-gate .note{margin:0 0 18px}
+/* Suggestions under an address box. */
+.rq-combo{position:relative;display:block}
+.rq-sugg{
+  position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:20;
+  background:var(--surface);border:1px solid var(--line-2);border-radius:10px;
+  box-shadow:var(--shadow);overflow:hidden;max-height:270px;overflow-y:auto;
+}
+.rq-sugg[hidden]{display:none}
+.rq-sugg button{
+  display:block;width:100%;text-align:left;border:0;background:none;cursor:pointer;
+  font:inherit;font-size:.9rem;color:var(--ink);padding:10px 12px;
+  border-bottom:1px solid var(--line);
+}
+.rq-sugg button:last-child{border-bottom:0}
+.rq-sugg button:hover,.rq-sugg button[aria-selected="true"]{background:var(--surface-2);color:var(--accent)}
 .rq-turnstile{
   display:flex;justify-content:center;
   margin-bottom:14px;min-height:65px;
