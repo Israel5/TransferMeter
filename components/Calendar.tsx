@@ -175,7 +175,14 @@ export function Calendar({
                 <li key={i} className="day-row">
                   <span className="when">{niceDate(l.date, "en").slice(5) + (l.time ? ` ${l.time}` : "")}</span>
                   <span className="what">
-                    <div className="who">{(l.quoteNo ? `#${l.quoteNo}  ` : "") + l.customer + (l.status === "approved" ? "" : ` (${l.status})`)}</div>
+                    {/* The name is the way back to the quote it came from: the
+                        calendar is where you notice something is wrong with a
+                        trip, and the quote is where you fix it. */}
+                    <Link className="who" href={`/trips/${l.quoteId}`}
+                          title={`Open quote ${l.quoteNo || l.customer}`}>
+                      {(l.quoteNo ? `#${l.quoteNo}  ` : "") + l.customer
+                        + (l.status === "approved" ? "" : ` (${l.status})`)}
+                    </Link>
                     <div className="route">{`${l.from} → ${l.to} · ${fmt(l.km, 0)} km · fuel ${money(l.cost)}`}</div>
                   </span>
                   {chat && <a className="wa" href={chat} target="_blank" rel="noopener" title={`Message ${l.customer}`}>WhatsApp</a>}
