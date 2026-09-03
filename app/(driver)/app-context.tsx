@@ -11,7 +11,7 @@ import {
   initialState, loadQuote, newQuote, saveQuote, withQuote,
   type AppState,
 } from "@/lib/state";
-import { draftMessage } from "@/lib/message";
+import { draftMessage, customerPayload } from "@/lib/message";
 import { buildPDF } from "@/lib/pdf";
 import { slugify, parseCoords } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
@@ -245,7 +245,9 @@ function useAppState() {
   };
 
   const savePdf = (q: Quote) => {
-    const bytes = buildPDF(q, st.settings);
+    // The same view the customer's page is given, so the document cannot
+    // contain anything their page would not.
+    const bytes = buildPDF(customerPayload(q, st.settings, (v: string) => waDigits(v, st.settings)));
     const name = ["transfer", slugify(q.quoteNo), slugify(q.customer, "quote")].filter(Boolean).join("-") + ".pdf";
     const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
     const a = document.createElement("a");

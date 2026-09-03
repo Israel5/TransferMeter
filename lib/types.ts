@@ -95,6 +95,25 @@ export type Quote = QuoteContent & {
 
 export type Lang = "pt" | "en" | "fr";
 
+/** What a customer is shown, and the only thing their documents are built
+ *  from. Deliberately not a Quote: the driver's address, cost and notes have
+ *  no field here to sit in. */
+export type CustomerViewLeg = {
+  k: string; d: string; h: string;
+  s: string[]; m: number[];
+  km: number; mn: number; pr: number;
+  pkm?: number; pmn?: number;
+};
+
+export type CustomerView = {
+  b?: string; p?: string; w?: string; n?: string; c?: string;
+  l?: Lang; savedAt?: string;
+  t?: CustomerViewLeg[];
+  xc?: { pax?: Counts; gear?: Counts; bags?: Counts };
+  seats?: number;
+  tot?: number;
+};
+
 export const DEFAULTS: Settings = {
   homeName: "", homeLat: 45.5019, homeLng: -73.5674,   // Montréal centre
   bizName: "", bizPhone: "", bizWhats: "", customerPage: "",

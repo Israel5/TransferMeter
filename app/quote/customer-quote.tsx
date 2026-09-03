@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/api";
+import { buildPDF } from "@/lib/pdf";
+import { slugify } from "@/lib/quote";
 
 /* What a customer sees. The link carries only a token; everything on the page
    comes from the row it unlocks, so a price changed after sending is the price
@@ -66,7 +68,7 @@ const T = {
     noneSub: "Peça um link novo para o seu motorista.",
     thanksYes: "Obrigado! Sua viagem está confirmada.",
     thanksNo: "Tudo bem — já fiquei sabendo.",
-    sending: "Enviando…", stops: "Trajeto",
+    sending: "Enviando…", stops: "Trajeto", pdf: "Baixar em PDF",
     yourRide: "Sua viagem", totalDriven: "Total rodado pelo motorista",
     failed: "Não consegui registrar sua resposta. Tenta de novo?",
     lockedNote: "Você já respondeu este orçamento, então os dados estão fechados.",
@@ -86,7 +88,7 @@ const T = {
     noneSub: "Ask your driver for a new link.",
     thanksYes: "Thank you — your trip is confirmed.",
     thanksNo: "No problem — I've been told.",
-    sending: "Sending…", stops: "Route",
+    sending: "Sending…", stops: "Route", pdf: "Download as PDF",
     yourRide: "Your journey", totalDriven: "Total driven by the driver",
     failed: "That didn't go through. Please try again.",
     lockedNote: "You've already answered this quote, so the details are closed.",
@@ -106,7 +108,7 @@ const T = {
     noneSub: "Demandez un nouveau lien à votre chauffeur.",
     thanksYes: "Merci — votre trajet est confirmé.",
     thanksNo: "Pas de souci — j'en suis informé.",
-    sending: "Envoi…", stops: "Trajet",
+    sending: "Envoi…", stops: "Trajet", pdf: "Télécharger en PDF",
     yourRide: "Votre trajet", totalDriven: "Distance totale parcourue",
     failed: "L'envoi n'a pas fonctionné. Réessayez.",
     lockedNote: "Vous avez déjà répondu à ce devis, les informations sont donc fermées.",
@@ -188,6 +190,20 @@ export function CustomerQuote({ token }: { token: string }) {
       setStatus(r.status);
     } catch { setFailed(true); }
     finally { setBusy(false); }
+  };
+
+  /** Their own copy, to keep or forward. Built here from what this page was
+   *  already given, so it can hold nothing the page does not show. */
+  const download = () => {
+    if (!q) return;
+    const bytes = buildPDF(q);
+    const name = ["transfer", slugify(q.n ?? ""), slugify(q.c ?? "", "quote")]
+      .filter(Boolean).join("-") + ".pdf";
+    const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
   const startEdit = () => {
@@ -362,6 +378,10 @@ export function CustomerQuote({ token }: { token: string }) {
             </div>
           )}
         </section>
+
+        <div className="cq-section cq-getpdf">
+          <button type="button" className="cq-btn ghost" onClick={download}>{L.pdf}</button>
+        </div>
 
         <div className="cq-total">
           <span>{L.total}</span>

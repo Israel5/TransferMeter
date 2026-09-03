@@ -1075,6 +1075,8 @@ footer.foot{margin-top:22px;color:var(--muted);font-size:.82rem;line-height:1.55
 .cq-btn.ghost{background:transparent;color:var(--muted)}
 .cq-btn.ghost:hover:not(:disabled){border-color:var(--muted);color:var(--ink)}
 
+.cq-getpdf{display:flex;justify-content:center;border-bottom:0;padding-top:14px;padding-bottom:16px}
+.cq-getpdf .cq-btn{flex:0 0 auto;padding:11px 20px}
 .cq-total{
   background:var(--slate);padding:16px 20px;
   display:flex;align-items:center;justify-content:space-between;

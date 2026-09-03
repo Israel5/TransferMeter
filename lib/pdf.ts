@@ -5,7 +5,7 @@
 import { fmt, dur, niceDate, countList, customerRoute, shortName } from "./quote";
 import { wordsFor } from "./words";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "./types";
-import type { Quote, Settings } from "./types";
+import type { CustomerView, Quote, Settings } from "./types";
 
 const WIN_ANSI: Record<number, number> = {0x2014:0x97,0x2013:0x96,0x2018:0x91,0x2019:0x92,0x201C:0x93,0x201D:0x94,0x2026:0x85,0x2022:0x95,0x20AC:0x80};
 function pdfText(str: string){
@@ -37,7 +37,36 @@ export function pdfWidth(str: string, size: number, bold?: boolean, track?: numb
   return w*size*(bold?1.04:1) + (track||0)*Math.max(0,String(str).length-1);
 }
 
-export function buildPDF(q: Quote, S: Settings): Uint8Array {
+/** The customer's copy, built from the customer's own view of the quote.
+ *
+ *  It used to take the whole quote and mask the driver's address on its way
+ *  through. That worked, but it meant the document was one forgotten step away
+ *  from printing a home address. It is built from the same payload the
+ *  customer's page is given, so there is nothing to leave out: the address is
+ *  not in the input. */
+export function buildPDF(v: CustomerView): Uint8Array {
+  // Named as the old shape so the drawing below reads unchanged.
+  const q = {
+    lang: v.l ?? "pt",
+    quoteNo: v.n ?? "",
+    customer: v.c ?? "",
+    savedAt: v.savedAt ?? new Date().toISOString(),
+    price: v.tot ?? 0,
+    pax: v.xc?.pax ?? {}, gear: v.xc?.gear ?? {}, bags: v.xc?.bags ?? {},
+    trips: (v.t ?? []).map((leg) => ({
+      label: leg.k === "ret" ? "Return" : "Outbound",
+      date: leg.d, time: leg.h,
+      stops: (leg.s ?? []).map((name) => ({ name })),
+      legKm: leg.m ?? [],
+      paxKm: leg.pkm ?? leg.km ?? 0,
+      paxMins: leg.pmn ?? leg.mn ?? 0,
+      mins: leg.mn ?? 0,
+      price: leg.pr ?? 0,
+    })),
+  } as unknown as Quote;
+  const S = { bizName: v.b ?? "", bizPhone: v.p ?? "" } as Settings;
+
+
   const W=612, H=792, M=54;
   const PAGES: string[][] = []; let ops: string[] = []; let y = 0;
 
