@@ -141,6 +141,16 @@ export function TripList({
         <input className="saved-search" type="search" placeholder="Search by name, number or place"
                value={filter} onChange={(e) => setFilter(e.target.value)} />
 
+        {/* By default this is money you could go and collect: agreed, driven,
+            unpaid. Ticking it adds work that is booked but not yet done --
+            a fair thing to want to see, and a different question: what the
+            book is worth rather than what is outstanding. */}
+        <label className="owed-scope">
+          <input type="checkbox" checked={showAhead}
+                 onChange={(e) => setShowAhead(e.target.checked)} />
+          <span>Include trips not driven yet</span>
+        </label>
+
         <ul className="saved-list">
           {shown.map((q) => {
             const st = known(q.status);
