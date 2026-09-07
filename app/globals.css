@@ -332,12 +332,39 @@ a.link:hover{text-decoration:underline}
 .wa:hover{background:color-mix(in srgb,var(--good) 18%,transparent)}
 .field .hint.resolved{color:var(--good)}
 /* ---------- saved quotes: scannable cards ---------- */
-.owed-scope{
-  display:flex;align-items:center;gap:8px;margin:10px 0 4px;
-  cursor:pointer;font-size:.82rem;color:var(--muted);
+/* What is outstanding, and which way you are counting it. */
+.owed-bar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:12px 0 4px;padding:10px 13px;
+  border:1px solid color-mix(in srgb,var(--amber) 35%,transparent);
+  background:color-mix(in srgb,var(--amber) 8%,transparent);
+  border-radius:11px;
 }
-.owed-scope input{width:16px;height:16px;accent-color:var(--accent)}
-.owed-scope:hover{color:var(--ink)}
+.owed-sum{display:flex;align-items:baseline;gap:8px;flex:1;min-width:0}
+.owed-sum .k{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+  font-size:.68rem;font-weight:600;color:var(--muted);
+}
+.owed-sum b{
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;
+  font-size:1.15rem;font-weight:600;color:var(--amber);line-height:1;
+}
+.owed-switch{
+  display:flex;gap:3px;flex:none;
+  background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px;
+}
+.owed-switch button{
+  background:transparent;border:0;border-radius:6px;cursor:pointer;
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.07em;
+  font-size:.7rem;font-weight:600;color:var(--muted);padding:5px 12px;
+}
+.owed-switch button:hover{color:var(--ink)}
+.owed-switch button[aria-pressed="true"]{background:var(--amber);color:#1a1206}
+@media (max-width:440px){
+  .owed-sum{width:100%}
+  .owed-switch{width:100%}
+  .owed-switch button{flex:1;text-align:center}
+}
 .saved-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .empty{color:var(--muted);font-size:.88rem;margin:0}
 .signin{

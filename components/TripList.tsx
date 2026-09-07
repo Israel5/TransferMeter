@@ -109,6 +109,11 @@ export function TripList({
   const [showAhead, setShowAhead] = useState(false);
   const [filter, setFilter] = useState("");
 
+  // Both readings, so the total can move with the choice and the control is
+  // hidden entirely when nobody owes anything either way.
+  const owedNow = quotes.reduce((n, q) => n + owedOn(q, settings, learned, false), 0);
+  const owedAll = quotes.reduce((n, q) => n + owedOn(q, settings, learned, true), 0);
+
   const needle = filter.trim().toLowerCase();
   const shown = quotes.filter((q) => {
     if (!needle) return true;
@@ -141,15 +146,26 @@ export function TripList({
         <input className="saved-search" type="search" placeholder="Search by name, number or place"
                value={filter} onChange={(e) => setFilter(e.target.value)} />
 
-        {/* By default this is money you could go and collect: agreed, driven,
-            unpaid. Ticking it adds work that is booked but not yet done --
-            a fair thing to want to see, and a different question: what the
-            book is worth rather than what is outstanding. */}
-        <label className="owed-scope">
-          <input type="checkbox" checked={showAhead}
-                 onChange={(e) => setShowAhead(e.target.checked)} />
-          <span>Include trips not driven yet</span>
-        </label>
+        {/* Two readings of the same money, so it is a choice between them
+            rather than a box to tick. Driven: what you could go and collect
+            today. Booked: what the book is worth. The total moves with it, so
+            the control shows its own effect. */}
+        {(owedNow > 0 || owedAll > 0) && (
+          <div className="owed-bar">
+            <span className="owed-sum">
+              <span className="k">Owed</span>
+              <b>${fmt(showAhead ? owedAll : owedNow, 0)}</b>
+            </span>
+            <span className="owed-switch" role="group" aria-label="Which unpaid trips to count">
+              <button type="button" aria-pressed={!showAhead}
+                      title="Trips already driven and not paid for"
+                      onClick={() => setShowAhead(false)}>Driven</button>
+              <button type="button" aria-pressed={showAhead}
+                      title="Everything agreed and unpaid, including trips still ahead"
+                      onClick={() => setShowAhead(true)}>Booked</button>
+            </span>
+          </div>
+        )}
 
         <ul className="saved-list">
           {shown.map((q) => {
