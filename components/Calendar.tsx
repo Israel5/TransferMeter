@@ -4,15 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import { fmt, money, legCost, toL100, niceDate, shortName } from "@/lib/quote";
 import { NumberField } from "./NumberField";
+import { customerStops, wazeLink } from "@/lib/waze";
 import { waLink } from "@/lib/whatsapp";
-import type { Quote, Settings } from "@/lib/types";
+import type { Quote, Settings, Stop } from "@/lib/types";
 
 type Leg = {
   date: string; time: string; status: string; contact: string;
   customer: string; quoteNo: string; label: string;
   km: number; price: number; cost: number; estCost: number; measured: boolean;
   tip: number; paid: boolean;
-  from: string; to: string; quoteId: number; legIndex: number;
+  from: string; to: string; stops: Stop[]; quoteId: number; legIndex: number;
 };
 
 /** Works in legs, not quotes: a round trip appears on both of its days. */
@@ -35,6 +36,7 @@ function bookedLegs(quotes: Quote[], settings: Settings, includePending: boolean
         measured: !!legCost(t, settings).real,
         tip: t.tip ?? 0, paid: !!t.paid,
         from: named[0] ?? "—", to: named[named.length - 1] ?? "—",
+        stops: t.stops ?? [],
         quoteId: q.id, legIndex: i,
       });
     });

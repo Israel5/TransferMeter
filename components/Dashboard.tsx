@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { fmt, dur, scheduleFor, shortDay } from "@/lib/quote";
-import { customerEnds } from "@/lib/reminders";
+import { fmt, dur, scheduleFor, shortDay, shortName } from "@/lib/quote";
+import { customerStops, wazeLink } from "@/lib/waze";
 import { waPretty } from "@/lib/whatsapp";
 import type { Lang, Quote, SavedTrip, Settings, Trip } from "@/lib/types";
 
@@ -25,6 +25,14 @@ export type Run = {
 const hhmm = (d: Date | null) =>
   d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "—";
 
+/** A saved leg, back in the shape the calculations take. */
+const toTrip = (trip: SavedTrip): Trip => ({
+  label: trip.label, date: trip.date, time: trip.time,
+  stops: trip.stops ?? [],
+  liveLegs: (trip.legKm ?? []).map((km) => ({ km: Number(km) || 0, mins: NaN })),
+  priceOverride: trip.price ?? null,
+});
+
 /** Local date, never UTC: a trip at 21:40 must not land on tomorrow. */
 export function isoDay(offset = 0) {
   const d = new Date();
@@ -38,17 +46,59 @@ export function isoDay(offset = 0) {
  *  not a debt, and mixing the two turns a number you should act on into one
  *  you learn to ignore. Oldest first, because that is the one to ask about.
  */
+/** When a leg was over: the customer out of the car and the fare due.
+ *
+ *  Preferably the arrival the schedule works out. Failing that -- a leg with no
+ *  distances yet -- the pick-up plus however long the journey takes. Failing
+ *  that too, the end of the day it was on, so a past date still counts as
+ *  finished while today's does not. Null when there is not even a date. */
+export function finishedAt(
+  trip: SavedTrip, s: Settings, learned: Record<string, number>,
+): Date | null {
+  if (!trip.date) return null;
+
+  // Every step is checked for being a real date. An arrival worked out from
+  // half-filled settings comes back as Invalid Date, whose getTime() is NaN,
+  // and NaN is not greater than now -- so an unchecked one would report every
+  // future trip as already driven and owed for.
+  const real = (d: Date | null | undefined) =>
+    d && Number.isFinite(d.getTime()) ? d : null;
+
+  const arrive = real(scheduleFor(toTrip(trip), s, learned)?.arrive);
+  if (arrive) return arrive;
+
+  if (trip.time) {
+    const start = real(new Date(`${trip.date}T${trip.time}`));
+    if (start) {
+      const mins = Number(trip.paxMins) || Number(trip.mins) || 0;
+      return real(new Date(start.getTime() + mins * 60000));
+    }
+  }
+
+  const [y, m, d] = trip.date.split("-").map(Number);
+  return y ? new Date(y, m - 1, d, 23, 59, 59) : null;
+}
+
+/** Trips already driven and not paid for.
+ *
+ *  Driven, not merely dated before today: a fare is due when the customer is
+ *  out of the car, so this morning's airport run belongs here by lunchtime.
+ *  A trip still ahead of its arrival does not, however much it is worth. */
 export function owedRuns(quotes: Quote[], s: Settings, learned: Record<string, number>): Run[] {
-  const today = isoDay(0);
+  const now = Date.now();
   const out: Run[] = [];
   (quotes ?? []).forEach((q) => {
     if ((q.status ?? "draft") !== "approved") return;
     (q.trips ?? []).forEach((trip, legIndex) => {
-      if (!trip.date || trip.date >= today || trip.paid) return;
+      if (trip.paid) return;
+      const done = finishedAt(trip, s, learned);
+      if (!done || !(done.getTime() <= now)) return;
       out.push({ quote: q, trip, legIndex, leave: null, pickup: null });
     });
   });
-  return out.sort((a, b) => (a.trip.date || "").localeCompare(b.trip.date || ""));
+  // Oldest first: that is the one to ask about.
+  return out.sort((a, b) =>
+    (a.trip.date + (a.trip.time || "")).localeCompare(b.trip.date + (b.trip.time || "")));
 }
 
 /** How long ago, in the words you would use out loud. */
@@ -74,17 +124,27 @@ export function runsOn(quotes: Quote[], day: string, s: Settings, learned: Recor
     if (st === "draft" || st === "declined") return;
     (q.trips ?? []).forEach((trip, legIndex) => {
       if (trip.date !== day) return;
-      const asTrip: Trip = {
-        label: trip.label, date: trip.date, time: trip.time,
-        stops: trip.stops ?? [],
-        liveLegs: (trip.legKm ?? []).map((km) => ({ km: Number(km) || 0, mins: NaN })),
-        priceOverride: trip.price ?? null,
-      };
-      const sch = scheduleFor(asTrip, s, learned);
+      const sch = scheduleFor(toTrip(trip), s, learned);
       out.push({ quote: q, trip, legIndex, leave: sch?.leave ?? null, pickup: sch?.pickup ?? null });
     });
   });
   return out.sort((a, b) => (a.trip.time || "99:99").localeCompare(b.trip.time || "99:99"));
+}
+
+/** Where they are picked up and where they are going, each one a tap away
+ *  from being navigated to. Reading a screen is not the job at 05:00; driving
+ *  there is. */
+function Route({ trip }: { trip: SavedTrip }) {
+  const { from, to } = customerStops(trip.stops);
+  const step = (stop: typeof from) => {
+    const name = shortName(String(stop?.name ?? "")) || "—";
+    const href = wazeLink(stop);
+    return href
+      ? <a className="go" href={href} target="_blank" rel="noopener"
+           title={`Navigate to ${stop?.name} in Waze`}>{name}</a>
+      : <span>{name}</span>;
+  };
+  return <span className="dash-route">{step(from)} <i>→</i> {step(to)}</span>;
 }
 
 /** Pick the language and act, in one press. */
@@ -131,7 +191,6 @@ function Block({
       ) : (
         <ul className="dash-list">
           {runs.map((r) => {
-            const { from, to } = customerEnds(r.trip);
             const key = `${r.quote.id}:${r.legIndex}`;
             const say = lang[key] ?? r.quote.lang ?? "pt";
             const sent = kind === "before" ? r.trip.remindedAt : r.trip.onWayAt;
@@ -147,7 +206,7 @@ function Block({
                   <button type="button" className="dash-name" onClick={() => onOpen(r.quote.id)}>
                     {r.quote.customer || "(no name)"}
                   </button>
-                  <span className="dash-route">{from} → {to}</span>
+                  <Route trip={r.trip} />
                   <span className="dash-meta">
                     {[
                       r.trip.label === "Return" ? "return" : "outbound",
@@ -200,7 +259,6 @@ export function Dashboard({
           </div>
           <ul className="dash-list">
             {owed.map((r) => {
-              const { from, to } = customerEnds(r.trip);
               const key = `${r.quote.id}:${r.legIndex}`;
               return (
                 <li key={key} className="dash-run">
@@ -212,7 +270,7 @@ export function Dashboard({
                     <button type="button" className="dash-name" onClick={() => onOpen(r.quote.id)}>
                       {r.quote.customer || "(no name)"}
                     </button>
-                    <span className="dash-route">{from} → {to}</span>
+                    <Route trip={r.trip} />
                     <span className="dash-meta">
                       {[shortDay(r.trip.date), r.quote.quoteNo ? `#${r.quote.quoteNo}` : "",
                         r.quote.contact ? waPretty(r.quote.contact, settings) : ""]

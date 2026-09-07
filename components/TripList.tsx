@@ -4,6 +4,7 @@ import { useState } from "react";
 import { fmt, money, fuelUsed, quoteTotals, toL100, shortName, shortDay } from "@/lib/quote";
 import { owedOn, tipTotal } from "@/lib/state";
 import { NumberField } from "./NumberField";
+import { customerStops as stopsOf, wazeLink } from "@/lib/waze";
 import { waLink, waHandle, waPretty } from "@/lib/whatsapp";
 import type { Actual, Quote, Settings } from "@/lib/types";
 
@@ -198,8 +199,20 @@ export function TripList({
                         <span className="lab">{legs.length > 1 ? (t.label === "Return" ? "Return" : "Out") : "Trip"}</span>
                         <span className="when">{(t.date ? shortDay(t.date) : "no date") + (t.time ? ` ${t.time}` : "")}</span>
                         <span className="path">
-                          {(ns[0] ?? "—") + " → " + (ns[ns.length - 1] ?? "—") + "  ·  "
-                            + fmt(t.paxKm ?? t.totalKm, 0) + " km with passenger"
+                          {[stopsOf(t.stops).from, stopsOf(t.stops).to].map((stop, k) => {
+                            const name = shortName(String(stop?.name ?? "")) || "—";
+                            const href = wazeLink(stop);
+                            return (
+                              <span key={k}>
+                                {k > 0 && " → "}
+                                {href
+                                  ? <a className="go" href={href} target="_blank" rel="noopener"
+                                       title={`Navigate to ${stop?.name} in Waze`}>{name}</a>
+                                  : name}
+                              </span>
+                            );
+                          })}
+                          {"  ·  " + fmt(t.paxKm ?? t.totalKm, 0) + " km with passenger"
                             + ((t.totalKm ?? 0) > (t.paxKm ?? 0)
                                 ? `, ${fmt(t.totalKm ?? 0, 0)} km driven`
                                 : "")}

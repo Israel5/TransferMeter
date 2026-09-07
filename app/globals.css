@@ -748,6 +748,14 @@ a.who:hover{color:var(--accent);text-decoration:underline;text-underline-offset:
 }
 .dash-name:hover{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
 .dash-route{font-size:.86rem;color:var(--ink-2)}
+.dash-route i{font-style:normal;color:var(--muted);padding:0 2px}
+/* An address you can drive to. Underlined only on approach, so a route reads
+   as a route rather than as a row of links. */
+.go{
+  color:inherit;text-decoration:none;
+  border-bottom:1px dotted color-mix(in srgb,currentColor 45%,transparent);
+}
+.go:hover{color:var(--accent);border-bottom-color:var(--accent)}
 .dash-meta{font-size:.75rem;color:var(--muted)}
 .dash-acts{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap}
 .dash-flag{
