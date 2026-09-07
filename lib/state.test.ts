@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { initialState, saveQuote, hasUnsavedChanges, loadQuote, withQuote, affectsCustomer } from "./state";
+import { initialState, saveQuote, hasUnsavedChanges, loadQuote, withQuote, affectsCustomer, owedOn } from "./state";
 import type { AppState } from "./state";
 import type { Quote, Stop } from "./types";
 
@@ -193,5 +193,43 @@ describe("changing a quote someone already has", () => {
     const st = editing(saved({ status: "sent" }));
     const w = affectsCustomer({ ...st, trips: [{ ...st.trips[0], date: "2026-09-30" }] });
     expect(w?.when).toBe("was sent");
+  });
+});
+
+describe("what a quote still owes you", () => {
+  const S = { kmPerL: 5, fuelPrice: 2, roadFactor: 1.55, avgSpeed: 55,
+              waitPerStop: 10, leaveBuffer: 20, seats: 7 } as never;
+  const past = "2020-01-01";
+  const ahead = "2099-01-01";
+
+  const twoLegs = (status: string) => saved({
+    status: status as never,
+    trips: [
+      { ...saved().trips[0], legId: "out", date: past, time: "10:00", price: 50, paid: false },
+      { ...saved().trips[0], legId: "ret", date: ahead, time: "10:00", price: 60, paid: false },
+    ],
+  });
+
+  it("counts only the leg that has been driven", () => {
+    expect(owedOn(twoLegs("approved"), S, {})).toBe(50);
+  });
+
+  it("counts both once you ask for what is not driven yet", () => {
+    expect(owedOn(twoLegs("approved"), S, {}, true)).toBe(110);
+  });
+
+  it("owes nothing on a quote they declined", () => {
+    expect(owedOn(twoLegs("declined"), S, {})).toBe(0);
+    expect(owedOn(twoLegs("declined"), S, {}, true)).toBe(0);
+  });
+
+  it("owes nothing on one merely sent, since nothing was agreed", () => {
+    expect(owedOn(twoLegs("sent"), S, {})).toBe(0);
+  });
+
+  it("stops owing once a leg is paid", () => {
+    const q = twoLegs("approved");
+    q.trips[0].paid = true;
+    expect(owedOn(q, S, {})).toBe(0);
   });
 });

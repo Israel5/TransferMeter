@@ -332,6 +332,12 @@ a.link:hover{text-decoration:underline}
 .wa:hover{background:color-mix(in srgb,var(--good) 18%,transparent)}
 .field .hint.resolved{color:var(--good)}
 /* ---------- saved quotes: scannable cards ---------- */
+.owed-scope{
+  display:flex;align-items:center;gap:8px;margin:10px 0 4px;
+  cursor:pointer;font-size:.82rem;color:var(--muted);
+}
+.owed-scope input{width:16px;height:16px;accent-color:var(--accent)}
+.owed-scope:hover{color:var(--ink)}
 .saved-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .empty{color:var(--muted);font-size:.88rem;margin:0}
 .signin{

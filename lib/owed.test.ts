@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { owedRuns, runsOn, isoDay, finishedAt } from "@/components/Dashboard";
+import { owedRuns, runsOn } from "@/components/Dashboard";
+import { isoDay, finishedAt } from "./quote";
 import type { Quote, Settings } from "./types";
 
 const day = (n: number) => {

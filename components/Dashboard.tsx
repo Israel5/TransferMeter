@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { fmt, dur, scheduleFor, shortDay, shortName } from "@/lib/quote";
+import { fmt, dur, scheduleFor, shortDay, shortName, finishedAt, isoDay, toTrip } from "@/lib/quote";
 import { customerStops, wazeLink } from "@/lib/waze";
 import { waPretty } from "@/lib/whatsapp";
 import type { Lang, Quote, SavedTrip, Settings, Trip } from "@/lib/types";
@@ -24,60 +24,6 @@ export type Run = {
 
 const hhmm = (d: Date | null) =>
   d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "—";
-
-/** A saved leg, back in the shape the calculations take. */
-const toTrip = (trip: SavedTrip): Trip => ({
-  label: trip.label, date: trip.date, time: trip.time,
-  stops: trip.stops ?? [],
-  liveLegs: (trip.legKm ?? []).map((km) => ({ km: Number(km) || 0, mins: NaN })),
-  priceOverride: trip.price ?? null,
-});
-
-/** Local date, never UTC: a trip at 21:40 must not land on tomorrow. */
-export function isoDay(offset = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Trips you have already driven and have not been paid for.
- *
- *  Only ones whose day has passed: a booking next month is work in the diary,
- *  not a debt, and mixing the two turns a number you should act on into one
- *  you learn to ignore. Oldest first, because that is the one to ask about.
- */
-/** When a leg was over: the customer out of the car and the fare due.
- *
- *  Preferably the arrival the schedule works out. Failing that -- a leg with no
- *  distances yet -- the pick-up plus however long the journey takes. Failing
- *  that too, the end of the day it was on, so a past date still counts as
- *  finished while today's does not. Null when there is not even a date. */
-export function finishedAt(
-  trip: SavedTrip, s: Settings, learned: Record<string, number>,
-): Date | null {
-  if (!trip.date) return null;
-
-  // Every step is checked for being a real date. An arrival worked out from
-  // half-filled settings comes back as Invalid Date, whose getTime() is NaN,
-  // and NaN is not greater than now -- so an unchecked one would report every
-  // future trip as already driven and owed for.
-  const real = (d: Date | null | undefined) =>
-    d && Number.isFinite(d.getTime()) ? d : null;
-
-  const arrive = real(scheduleFor(toTrip(trip), s, learned)?.arrive);
-  if (arrive) return arrive;
-
-  if (trip.time) {
-    const start = real(new Date(`${trip.date}T${trip.time}`));
-    if (start) {
-      const mins = Number(trip.paxMins) || Number(trip.mins) || 0;
-      return real(new Date(start.getTime() + mins * 60000));
-    }
-  }
-
-  const [y, m, d] = trip.date.split("-").map(Number);
-  return y ? new Date(y, m - 1, d, 23, 59, 59) : null;
-}
 
 /** Trips already driven and not paid for.
  *

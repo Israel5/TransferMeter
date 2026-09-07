@@ -9,7 +9,7 @@ export default function TripsPage() {
   const router = useRouter();
 
   return (
-    <TripList quotes={st.quotes} settings={st.settings}
+    <TripList quotes={st.quotes} settings={st.settings} learned={st.learned}
               onOpen={(id) => router.push(`/trips/${id}`)}
               onDelete={doDelete} onPdf={savePdf} onSend={sendQuote} onCopyLink={copyLink}
               onRevokeLink={revokeLink} onPatch={patchQuote}

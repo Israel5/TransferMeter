@@ -91,9 +91,9 @@ function FuelRow({
 
 /** The name leads; everything else supports it. Detail only when asked for. */
 export function TripList({
-  quotes, settings, onOpen, onDelete, onPdf, onSend, onCopyLink, onRevokeLink, onPatch, onNew,
+  quotes, settings, learned, onOpen, onDelete, onPdf, onSend, onCopyLink, onRevokeLink, onPatch, onNew,
 }: {
-  quotes: Quote[]; settings: Settings;
+  quotes: Quote[]; settings: Settings; learned: Record<string, number>;
   onOpen: (id: number) => void;
   onDelete: (id: number) => void;
   onPdf: (q: Quote) => void;
@@ -106,6 +106,7 @@ export function TripList({
   const [openIds, setOpenIds] = useState<Set<number>>(new Set());
   // Revoking breaks a link already in someone's hands, so it asks first.
   const [confirming, setConfirming] = useState<number | null>(null);
+  const [showAhead, setShowAhead] = useState(false);
   const [filter, setFilter] = useState("");
 
   const needle = filter.trim().toLowerCase();
@@ -145,7 +146,7 @@ export function TripList({
             const st = known(q.status);
             const legs = q.trips ?? [];
             const tips = tipTotal(q);
-            const owed = owedOn(q);
+            const owed = owedOn(q, settings, learned, showAhead);
             const isOpen = openIds.has(q.id);
             const dates = legs.filter((t) => t.date).map((t) => shortDay(t.date));
             const named = (legs[0]?.stops ?? [])

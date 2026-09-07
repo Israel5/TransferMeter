@@ -1,6 +1,6 @@
 import { DEFAULTS, emptyPax, emptyGear, emptyBags } from "./types";
 import type { Counts, Lang, Quote, QuoteContent, SavedTrip, Settings, Stop, Trip } from "./types";
-import { tripTotals, grandTotals } from "./quote";
+import { tripTotals, grandTotals, finishedAt } from "./quote";
 
 export type AppState = {
   settings: Settings;
@@ -228,8 +228,31 @@ export function affectsCustomer(st: AppState): { customer: string; when: string 
   };
 }
 
-export const owedOn = (q: Quote) =>
-  (q.trips ?? []).reduce((n, t) => n + (t.paid ? 0 : Number(t.price) || 0), 0);
+/** What a quote still owes you.
+ *
+ *  Only a quote they agreed to: one they declined is not a debt, and one you
+ *  have merely sent is not either -- nothing has been driven and nothing may
+ *  ever be. And only the legs actually finished, counted one at a time, so a
+ *  round trip whose outbound is done and whose return is next week owes you
+ *  for the outbound alone.
+ *
+ *  `includeAhead` drops the second rule, for when you want the whole book
+ *  rather than what is collectable today. */
+export function owedOn(
+  q: Quote, s: Settings, learned: Record<string, number>,
+  includeAhead = false,
+): number {
+  if ((q.status ?? "draft") !== "approved") return 0;
+  const now = Date.now();
+  return (q.trips ?? []).reduce((n, t) => {
+    if (t.paid) return n;
+    if (!includeAhead) {
+      const done = finishedAt(t, s, learned);
+      if (!done || !(done.getTime() <= now)) return n;
+    }
+    return n + (Number(t.price) || 0);
+  }, 0);
+}
 
 export const tipTotal = (q: Quote) =>
   (q.trips ?? []).reduce((n, t) => n + (Number(t.tip) || 0), 0);
