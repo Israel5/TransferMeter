@@ -5,6 +5,10 @@
 -- here so the real schema -- not a copy of it, the file that is deployed -- can
 -- be loaded into a throwaway database and have its rules tested.
 
+-- Supabase enables this; a bare Postgres does not. schema.sql uses
+-- gen_random_bytes for the request secret.
+create extension if not exists pgcrypto;
+
 create schema if not exists auth;
 
 create table if not exists auth.users (
