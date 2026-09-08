@@ -103,6 +103,30 @@ describe("opening and folding back", () => {
     expect(st.editingId).toBe(10);
   });
 
+  // A customer request reached the database with no legs at all, and opening it
+  // took the editor down: it reads trips[active] and there was nothing there.
+  it("gives a quote stored with no legs one to edit", () => {
+    const st = loadQuote(editing(saved({ trips: [] })), 10);
+    expect(st.trips).toHaveLength(1);
+    expect(st.trips[0].stops.length).toBeGreaterThan(0);
+    expect(st.editingId).toBe(10);
+  });
+
+  it("survives a leg stored without stops", () => {
+    const bare = saved();
+    delete (bare.trips[0] as { stops?: unknown }).stops;
+    expect(() => loadQuote(editing(bare), 10)).not.toThrow();
+  });
+
+  // legKm: [] means "not measured yet", not "measured as nothing" -- an empty
+  // array is truthy, and reading it as measurements pinned every leg to zero.
+  it("does not read an empty distance list as measurements", () => {
+    const st = loadQuote(editing(saved({
+      trips: [{ ...saved().trips[0], legKm: [] }],
+    })), 10);
+    expect(st.trips[0].liveLegs).toBeNull();
+  });
+
   it("does nothing for a quote that is not there", () => {
     const st = editing(saved());
     expect(loadQuote(st, 999)).toBe(st);

@@ -139,16 +139,24 @@ export function withQuote(st: AppState, q: Quote): AppState {
 export function loadQuote(st: AppState, id: number): AppState {
   const q = st.quotes.find((x) => x.id === id);
   if (!q) return st;
+  // A quote always opens with at least one leg to edit. The editor reads
+  // trips[active] and works on it unconditionally, and it is right to: a leg
+  // cannot be removed while it is the last one. But a *stored* quote can have
+  // none -- a customer request that arrived with none does -- and reaching the
+  // editor with an empty list took the whole page down rather than showing an
+  // empty route to fill in.
+  const trips = (q.trips ?? []).map((t) => ({
+    legId: t.legId,
+    label: t.label, date: t.date || "", time: t.time || "",
+    stops: (t.stops ?? []).map((s) => ({ ...s })),
+    liveLegs: t.legKm?.length ? t.legKm.map((km) => ({ km: Number(km) || 0, mins: NaN })) : null,
+    priceOverride: t.price,          // pin the fare that was quoted
+    actual: t.actual,                // and the readings taken since
+  }));
+
   return {
     ...st,
-    trips: q.trips.map((t) => ({
-      legId: t.legId,
-      label: t.label, date: t.date || "", time: t.time || "",
-      stops: t.stops.map((s) => ({ ...s })),
-      liveLegs: t.legKm ? t.legKm.map((km) => ({ km: Number(km) || 0, mins: NaN })) : null,
-      priceOverride: t.price,          // pin the fare that was quoted
-      actual: t.actual,                // and the readings taken since
-    })),
+    trips: trips.length ? trips : [newTrip(st.settings)],
     active: 0,
     customer: q.customer || "", contact: q.contact || "", notes: q.notes || "",
     quoteNo: q.quoteNo || "", editingId: q.id,

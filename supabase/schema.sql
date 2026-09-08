@@ -146,6 +146,8 @@ declare
   clean     jsonb;
   want      text;
   new_id    bigint;
+  home      text;
+  legs      jsonb;
 begin
   select owner, request_secret into the_owner, want from public.config where id;
   if the_owner is null then raise exception 'no driver configured'; end if;
@@ -165,6 +167,50 @@ begin
     raise exception 'that request is too large';
   end if;
 
+  -- Types are checked with jsonb_typeof, never with a jsonpath filter.
+  -- `$.trips ? (@.type() == "array")` reads as "keep it if it is an array" and
+  -- keeps nothing: jsonpath is lax by default, so it unwraps the array first
+  -- and binds @ to each element, which is an object. The test could not pass,
+  -- and the coalesce behind it turned every customer's route, date and time
+  -- into [] on the way in. It did that to a real request before anyone noticed.
+  if jsonb_typeof(payload->'trips') = 'array'
+     and jsonb_array_length(payload->'trips') > 4 then
+    raise exception 'too many legs in that request';
+  end if;
+
+  -- A customer says where they want to go; the app stores a route the car can
+  -- drive, which leaves from and returns to the driver's own address. Convert
+  -- here, so a request opens in the editor as an ordinary quote instead of as a
+  -- shape nothing downstream knows how to read.
+  select coalesce(data->>'homeName', '') into home
+    from public.settings where owner = the_owner limit 1;
+
+  select coalesce(jsonb_agg(
+           jsonb_build_object(
+             'legId', 'r' || md5(random()::text || clock_timestamp()::text),
+             'label', case when t->>'label' = 'Return' then 'Return' else 'Outbound' end,
+             'date',  left(coalesce(t->>'date', ''), 10),
+             'time',  left(coalesce(t->>'time', ''), 5),
+             'stops', case when home = '' then '[]'::jsonb
+                           else jsonb_build_array(jsonb_build_object('name', home, 'base', true)) end
+                   || jsonb_build_array(
+                        jsonb_build_object('name', left(coalesce(trim(t->>'from'), ''), 200), 'base', false),
+                        jsonb_build_object('name', left(coalesce(trim(t->>'to'),   ''), 200), 'base', false))
+                   || case when home = '' then '[]'::jsonb
+                           else jsonb_build_array(jsonb_build_object('name', home, 'base', true)) end,
+             -- Nothing is measured or priced yet; the driver does that on opening it.
+             'legKm', '[]'::jsonb,
+             'totalKm', 0, 'mins', 0, 'cost', 0, 'price', 0,
+             'paxKm', 0, 'paxMins', 0,
+             'tip', 0, 'paid', false, 'override', null)
+           order by ord), '[]'::jsonb)
+    into legs
+    from jsonb_array_elements(
+           case when jsonb_typeof(payload->'trips') = 'array'
+                then payload->'trips' else '[]'::jsonb end) with ordinality as e(t, ord)
+   where jsonb_typeof(t) = 'object'
+     and (coalesce(trim(t->>'from'), '') <> '' or coalesce(trim(t->>'to'), '') <> '');
+
   clean := jsonb_build_object(
     'customer', left(trim(payload->>'customer'), 120),
     'contact',  left(coalesce(trim(payload->>'contact'), ''), 60),
@@ -172,15 +218,11 @@ begin
     'lang',     case when payload->>'lang' in ('pt','en','fr') then payload->>'lang' else 'pt' end,
     'origin',   'customer',
     'savedAt',  to_jsonb(now()),
-    'trips',    coalesce(jsonb_path_query_first(payload, '$.trips ? (@.type() == "array")'), '[]'::jsonb),
-    'pax',      coalesce(jsonb_path_query_first(payload, '$.pax  ? (@.type() == "object")'), '{}'::jsonb),
-    'gear',     coalesce(jsonb_path_query_first(payload, '$.gear ? (@.type() == "object")'), '{}'::jsonb),
-    'bags',     coalesce(jsonb_path_query_first(payload, '$.bags ? (@.type() == "object")'), '{}'::jsonb)
+    'trips',    legs,
+    'pax',      case when jsonb_typeof(payload->'pax')  = 'object' then payload->'pax'  else '{}'::jsonb end,
+    'gear',     case when jsonb_typeof(payload->'gear') = 'object' then payload->'gear' else '{}'::jsonb end,
+    'bags',     case when jsonb_typeof(payload->'bags') = 'object' then payload->'bags' else '{}'::jsonb end
   );
-
-  if jsonb_array_length(clean -> 'trips') > 4 then
-    raise exception 'too many legs in that request';
-  end if;
 
   insert into public.quotes (owner, status, data)
   values (the_owner, 'requested', clean)
