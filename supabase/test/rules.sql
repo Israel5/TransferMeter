@@ -9,10 +9,14 @@
 
 \set ON_ERROR_STOP on
 \set QUIET on
-set client_min_messages = warning;
+-- notice, not warning: the run prints how many rules it checked, so a pass
+-- that checked nothing cannot be mistaken for a pass.
+set client_min_messages = notice;
 
+set client_min_messages = warning;
 \i supabase/test/harness.sql
 \i supabase/schema.sql
+set client_min_messages = notice;
 
 -- One driver, as a real installation has.
 insert into auth.users (id) values ('11111111-1111-1111-1111-111111111111')
