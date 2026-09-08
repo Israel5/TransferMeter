@@ -205,13 +205,27 @@ export async function push(sb: SupabaseClient, owner: string, st: AppState) {
     quoteNo: st.quoteNo, editingId: st.editingId, lang: st.lang,
   };
 
+  // An update, not an upsert. PostgREST applies filters to an update and
+  // ignores them on an upsert -- so the same three lines written as an upsert
+  // looked like a guard, passed every test I gave it, and guarded nothing.
   const seen = Number(st.settingsVersion ?? 0);
   const { data: rows, error: e2 } = await sb.from("settings")
-    .upsert({ owner, data: st.settings, draft, version: seen + 1 }, { onConflict: "owner" })
-    .gte("version", 0)
+    .update({ data: st.settings, draft, version: seen + 1 })
+    .eq("owner", owner)
     .lte("version", seen)          // refuse to write over a newer generation
     .select("version");
   if (e2) throw new Error(e2.message);
+
+  // No row yet: this account has never saved settings. Create it, and let the
+  // primary key decide the race if two tabs arrive at once.
+  if ((!rows || rows.length === 0) && seen === 0) {
+    const { data: made } = await sb.from("settings")
+      .insert({ owner, data: st.settings, draft, version: 1 })
+      .select("version");
+    if (made && made.length) {
+      return { adopted, settingsVersion: 1, settingsRefused: false };
+    }
+  }
 
   let settingsVersion = seen + 1;
   let settingsRefused = false;
