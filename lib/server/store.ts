@@ -313,12 +313,41 @@ export async function exportAll(sb: SupabaseClient): Promise<Backup> {
  *  The owner in the file is ignored: rows are written to whoever is signed in,
  *  so a backup can be restored into a different account and cannot be used to
  *  write into somebody else's. */
+/* A restored quote always arrives with a leg.
+ *
+ * The database refuses a quote with none (quotes_have_a_leg), and it is right
+ * to: that state only ever came from a fault. But a backup taken before the
+ * fault was found still holds one, and refusing to restore a backup is a worse
+ * failure than the one being guarded against. So it is mended on the way in,
+ * to the same empty route the editor would have shown for it.
+ */
+function withALeg(data: unknown, homeName: string): unknown {
+  const q = (data ?? {}) as { trips?: unknown };
+  if (Array.isArray(q.trips) && q.trips.length) return data;
+
+  const base = homeName ? [{ name: homeName, base: true }] : [];
+  return {
+    ...q,
+    trips: [{
+      label: "Outbound", date: "", time: "",
+      stops: [...base, { name: "", base: false }, { name: "", base: false }, ...base],
+      legKm: [], totalKm: 0, mins: 0, cost: 0, price: 0, paxKm: 0, paxMins: 0,
+      tip: 0, paid: false, override: null,
+    }],
+  };
+}
+
 export async function importAll(
   sb: SupabaseClient, owner: string, backup: Backup,
   opts: { replace?: boolean } = {},
 ) {
   if (backup?.app !== "transfer-meter") throw new Error("That is not a Transfer Meter backup.");
   if (backup.version !== 1) throw new Error(`That backup is version ${backup.version}; this app reads version 1.`);
+
+  // The backup's own home address, so a mended leg starts and ends where the
+  // rest of that backup's quotes do.
+  const home = String(
+    (backup.settings?.data as Record<string, unknown> | undefined)?.homeName ?? "");
 
   let quotes = 0, learned = 0;
   if (Array.isArray(backup.quotes) && backup.quotes.length) {
@@ -329,7 +358,7 @@ export async function importAll(
         ...(typeof q.quote_no === "string" && q.quote_no ? { quote_no: q.quote_no } : {}),
         status: typeof q.status === "string" ? q.status : "draft",
         ...(typeof q.share_token === "string" && q.share_token ? { share_token: q.share_token } : {}),
-        data: q.data,
+        data: withALeg(q.data, home),
       }));
     if (rows.length) {
       const { error } = await sb.from("quotes").upsert(rows, { onConflict: "id" });

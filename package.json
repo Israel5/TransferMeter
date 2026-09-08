@@ -10,7 +10,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:db": "bash scripts/db-test.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",

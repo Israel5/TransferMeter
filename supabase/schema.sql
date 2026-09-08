@@ -33,8 +33,31 @@ create table if not exists public.quotes (
   answered_at  timestamptz,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
-  unique (owner, quote_no)
+  unique (owner, quote_no),
+  -- A quote is a journey, so it has at least one leg. Enforced here rather than
+  -- only in the code that writes, because "at least one" was already true of
+  -- every path that writes and a customer request still reached this table with
+  -- none: the function meant to keep the legs dropped them silently, and nothing
+  -- downstream was in a position to notice. A constraint is what makes a write
+  -- that loses the journey fail loudly instead of storing a quote nobody can
+  -- open. The addresses inside a leg are deliberately not checked: a driver's
+  -- own draft legitimately starts with blank stops and is filled in as it goes.
+  --
+  -- coalesce, because a check constraint rejects only what is false, and an
+  -- absent key makes this unknown rather than false. Written without it, the
+  -- constraint caught {"trips": []} and waved through a quote with no trips key
+  -- at all -- which is precisely the shape that caused the trouble.
+  constraint quotes_have_a_leg check (
+    coalesce(jsonb_typeof(data->'trips'), '') = 'array'
+    and jsonb_array_length(data->'trips') >= 1)
 );
+
+-- Added after the table existed, for a database created before the rule did.
+do $$ begin
+  alter table public.quotes add constraint quotes_have_a_leg check (
+    coalesce(jsonb_typeof(data->'trips'), '') = 'array'
+    and jsonb_array_length(data->'trips') >= 1);
+exception when duplicate_object then null; end $$;
 
 -- The number is the id, with the year it was created in front. Written once,
 -- at insert, so a quote created in 2026 keeps its 2026 next January.

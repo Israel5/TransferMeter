@@ -19,3 +19,24 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+
+  # The rules the database enforces, against a real Postgres. schema.sql is
+  # loaded into an empty database and then asked to refuse the fifteen ways a
+  # quote request can arrive incomplete. One of those ways -- a route the
+  # function silently dropped -- reached a customer's quote before this existed.
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+        ports: ['5432:5432']
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm run test:db
+        env:
+          DATABASE_URL: postgres://postgres:test@127.0.0.1:5432/postgres
