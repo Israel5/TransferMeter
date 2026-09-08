@@ -167,6 +167,33 @@ begin
     raise exception 'that request is too large';
   end if;
 
+  -- A way to reply, and both ends of the journey. Required *here*, because the
+  -- form asks for all three and refuses to submit without them -- and the form
+  -- runs in a browser, which can enforce nothing. This route is reachable
+  -- directly. Every rule the form states has to be restated where it counts.
+  if coalesce(trim(payload->>'contact'), '') = '' then
+    raise exception 'a way to reply is required';
+  end if;
+
+  -- coalesce, because an absent key gives jsonb_typeof NULL, and NULL <> 'array'
+  -- is NULL rather than true: the guard read correctly and let it straight past.
+  if coalesce(jsonb_typeof(payload->'trips'), '') <> 'array'
+     or jsonb_array_length(payload->'trips') = 0 then
+    raise exception 'a pickup and a destination are required';
+  end if;
+
+  -- Every leg, not merely the first: a return leg missing its destination is a
+  -- request the driver cannot act on either. Rejected outright rather than
+  -- stored half-formed, so nothing is silently dropped a second time.
+  if exists (
+    select 1 from jsonb_array_elements(payload->'trips') t
+     where jsonb_typeof(t) <> 'object'
+        or coalesce(trim(t->>'from'), '') = ''
+        or coalesce(trim(t->>'to'), '') = ''
+  ) then
+    raise exception 'a pickup and a destination are required';
+  end if;
+
   -- Types are checked with jsonb_typeof, never with a jsonpath filter.
   -- `$.trips ? (@.type() == "array")` reads as "keep it if it is an array" and
   -- keeps nothing: jsonpath is lax by default, so it unwraps the array first
@@ -205,11 +232,7 @@ begin
              'tip', 0, 'paid', false, 'override', null)
            order by ord), '[]'::jsonb)
     into legs
-    from jsonb_array_elements(
-           case when jsonb_typeof(payload->'trips') = 'array'
-                then payload->'trips' else '[]'::jsonb end) with ordinality as e(t, ord)
-   where jsonb_typeof(t) = 'object'
-     and (coalesce(trim(t->>'from'), '') <> '' or coalesce(trim(t->>'to'), '') <> '');
+    from jsonb_array_elements(payload->'trips') with ordinality as e(t, ord);
 
   clean := jsonb_build_object(
     'customer', left(trim(payload->>'customer'), 120),
