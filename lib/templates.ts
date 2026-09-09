@@ -31,6 +31,7 @@ export const VARIABLES: { name: string; what: string }[] = [
   { name: "date", what: "Trip date, written out — Tuesday, 8 September" },
   { name: "time", what: "Pick-up time, 17:00" },
   { name: "leg", what: "“Outbound” or “Return”" },
+  { name: "journey", what: "Every leg of the trip: route, date and price" },
   { name: "from", what: "Where you collect them" },
   { name: "to", what: "Where they are going" },
   { name: "km", what: "Their journey in km" },
@@ -62,8 +63,8 @@ export const DEFAULTS: Record<MessageKind, Record<Lang, string>> = {
 
 Segue o orçamento do seu transfer{{quote_no_suffix}}:
 
-{{from}} → {{to}}
-{{date_time}}
+{{journey}}
+
 Total: {{total}}
 
 Você pode ver tudo e confirmar por aqui: {{link}}
@@ -75,8 +76,8 @@ Qualquer dúvida, é só me chamar.
 
 Here is the quote for your transfer{{quote_no_suffix}}:
 
-{{from}} → {{to}}
-{{date_time}}
+{{journey}}
+
 Total: {{total}}
 
 You can see everything and confirm here: {{link}}
@@ -88,8 +89,8 @@ Any questions, just ask.
 
 Voici le devis pour votre transfert{{quote_no_suffix}} :
 
-{{from}} → {{to}}
-{{date_time}}
+{{journey}}
+
 Total : {{total}}
 
 Vous pouvez tout voir et confirmer ici : {{link}}
@@ -256,6 +257,42 @@ function dateAndTime(date: string, time: string, lang: Lang): string {
   return "";
 }
 
+/* Every leg of the quote, not just the one being messaged about.
+ *
+ * {{from}} and {{to}} describe a single leg, which is right for a reminder --
+ * that goes out the day before one particular journey. It is wrong for the
+ * quote, which covers the whole booking: a return trip printed one route and
+ * the total for two, so the customer read a doubled price against a journey
+ * they could see only half of.
+ *
+ * The label and the per-leg price appear only when there is more than one leg.
+ * With a single journey there is nothing to tell apart, and "Outbound" on its
+ * own implies a return that was never quoted.
+ *
+ * No prose here on purpose. A driver owns the words in their templates, so
+ * this contributes only the leg's own name -- already translated, already the
+ * {{leg}} variable -- and the figures.
+ */
+function journeyBlock(q: Quote, lang: Lang): string {
+  const legs = q.trips ?? [];
+  const many = legs.length > 1;
+
+  return legs.map((t) => {
+    const named = (t.stops ?? [])
+      .filter((st) => !st.base && String(st.name || "").trim())
+      .map((st) => shortName(st.name));
+    const route = [named[0], named[named.length - 1]].filter(Boolean).join(" \u2192 ");
+
+    const head = many
+      ? [`*${t.label === "Return" ? LEG[lang].ret : LEG[lang].out}*`,
+         Number(t.price) ? `$${fmt(t.price, 0)}` : ""].filter(Boolean).join(" \u00b7 ")
+      : "";
+
+    return [head, route, dateAndTime(t.date ?? "", t.time ?? "", lang)]
+      .filter(Boolean).join("\n");
+  }).filter(Boolean).join("\n\n");
+}
+
 export function varsFor(
   q: Quote, trip: SavedTrip | undefined, link: string, s: Settings, lang: Lang,
   opts: { when?: "today" | "tomorrow" } = {},
@@ -286,6 +323,7 @@ export function varsFor(
     date: trip?.date ? spokenDate(trip.date, lang) : "",
     time: trip?.time ?? "",
     leg: trip ? (trip.label === "Return" ? LEG[lang].ret : LEG[lang].out) : "",
+    journey: journeyBlock(q, lang),
     from: named[0] ?? "",
     to: named[named.length - 1] ?? "",
     km: trip ? `${fmt(trip.paxKm ?? trip.totalKm ?? 0, 1)} km` : "",

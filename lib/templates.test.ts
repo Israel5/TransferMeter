@@ -66,3 +66,58 @@ describe("values that are not there", () => {
     expect(renderTemplate("A {{nmae}} B", { name: "x" })).toBe("A {{nmae}} B");
   });
 });
+
+describe("a quote that has more than one leg", () => {
+  const twoLegs = (): Quote => ({
+    ...q,
+    trips: [
+      { ...q.trips[0], label: "Outbound", date: "2026-09-12", time: "06:00", price: 40,
+        stops: [{ name: "Home", base: true }, { name: "70 Rue Saint-Ferdinand" },
+                { name: "YUL — Montréal-Trudeau Airport" }, { name: "Home", base: true }] },
+      { ...q.trips[0], label: "Return", date: "2026-09-17", time: "00:40", price: 40,
+        stops: [{ name: "Home", base: true }, { name: "YUL — Montréal-Trudeau Airport" },
+                { name: "70 Rue Saint-Ferdinand" }, { name: "Home", base: true }] },
+    ],
+  } as unknown as Quote);
+
+  // The fault: a return trip printed the outbound route and the total for both,
+  // so the customer saw one journey priced at twice what it looked like.
+  it("shows every leg, not only the first", () => {
+    const m = buildMessage("quote", twoLegs(), twoLegs().trips[0], "L", S, "pt");
+    expect(m).toContain("70 Rue Saint-Ferdinand → YUL");
+    expect(m).toContain("YUL → 70 Rue Saint-Ferdinand");
+    expect(m).toContain("sábado, 12 de setembro, às 06:00");
+    expect(m).toContain("quinta-feira, 17 de setembro, às 00:40");
+  });
+
+  it("names each leg and prices it, so the total adds up on the page", () => {
+    const m = buildMessage("quote", twoLegs(), twoLegs().trips[0], "L", S, "pt");
+    expect(m).toContain("*Ida*");
+    expect(m).toContain("*Volta*");
+    expect(m.match(/\$40/g)).toHaveLength(2);
+    expect(m).toContain("Total: $80");
+  });
+
+  it("says it in the customer's own language", () => {
+    expect(buildMessage("quote", twoLegs(), undefined, "L", S, "en")).toContain("*Outbound*");
+    expect(buildMessage("quote", twoLegs(), undefined, "L", S, "fr")).toContain("*Retour*");
+  });
+
+  // A lone journey has nothing to tell apart, and "Outbound" on its own would
+  // imply a return that was never quoted.
+  it("leaves the label and the per-leg price off a single journey", () => {
+    const one = { ...twoLegs(), trips: [twoLegs().trips[0]] };
+    const m = buildMessage("quote", one, one.trips[0], "L", S, "pt");
+    expect(m).not.toContain("*Ida*");
+    expect(m).toContain("70 Rue Saint-Ferdinand → YUL");
+    expect(m).toContain("Total: $40");
+  });
+
+  // The reminder is about one journey by design: it goes out the day before it.
+  it("leaves the per-leg messages alone", () => {
+    const m = buildMessage("reminder", twoLegs(), twoLegs().trips[1], "L", S, "pt",
+                           { when: "tomorrow" });
+    expect(m).toContain("YUL");
+    expect(m).not.toContain("*Ida*");
+  });
+});
