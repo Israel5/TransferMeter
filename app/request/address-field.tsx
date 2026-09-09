@@ -47,7 +47,32 @@ export function AddressField({
     }, 320);
   };
 
-  const take = (s: Suggestion) => { onChange(s.text); setOpen(false); setItems([]); };
+  // The latest value, for the lookup below to check against: by the time Google
+  // answers, the box may have been retyped or cleared.
+  const latest = useRef(value);
+  latest.current = value;
+
+  /* Take the suggestion's own text now, and the place's full address a moment
+   * later. Google's suggestions stop at the city; its formatted address carries
+   * the postal code, which is what lets you tell one Rue Saint-Ferdinand from
+   * another and what the driver reads back to you to confirm.
+   *
+   * Nothing waits on it, and nothing breaks without it: if the lookup fails, or
+   * you have typed on since, the text you picked stands. */
+  const take = (s: Suggestion) => {
+    onChange(s.text);
+    setOpen(false);
+    setItems([]);
+    if (!s.placeId) return;
+
+    fetch(`/api/place?id=${encodeURIComponent(s.placeId)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const full = String(d?.address ?? "").trim();
+        if (full && latest.current === s.text) onChange(full);
+      })
+      .catch(() => { /* what you picked stands */ });
+  };
 
   return (
     <div className="rq-field wide">

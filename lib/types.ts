@@ -113,6 +113,9 @@ export type Lang = "pt" | "en" | "fr";
 export type CustomerViewLeg = {
   k: string; d: string; h: string;
   s: string[]; m: number[];
+  /** Which stops are real addresses rather than the driver's base, and so may
+   *  be linked to a map. Absent on links sent before this existed. */
+  r?: boolean[];
   km: number; mn: number; pr: number;
   pkm?: number; pmn?: number;
 };

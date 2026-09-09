@@ -60,6 +60,9 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
         k: t.label === "Return" ? "ret" : "out",
         d: t.date || "", h: t.time || "",
         s: v.stops,
+        // Which stops are addresses rather than the driver's base, so the
+        // page knows which it may link to a map.
+        r: v.real,
         m: v.legKm,
         km: Math.round(v.km * 10) / 10, mn: Math.round(t.mins ?? 0), pr: t.price ?? 0,
         // What they are actually in the car for. Without this the sheet shows

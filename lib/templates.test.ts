@@ -86,8 +86,10 @@ describe("a quote that has more than one leg", () => {
     const m = buildMessage("quote", twoLegs(), twoLegs().trips[0], "L", S, "pt");
     expect(m).toContain("70 Rue Saint-Ferdinand → YUL");
     expect(m).toContain("YUL → 70 Rue Saint-Ferdinand");
-    expect(m).toContain("sábado, 12 de setembro, às 06:00");
-    expect(m).toContain("quinta-feira, 17 de setembro, às 00:40");
+    // Capitalised: Portuguese lowercases weekdays inside a sentence, and a
+    // line that opens with "quinta-feira" reads as a typo.
+    expect(m).toContain("Sábado, 12 de setembro, às 06:00");
+    expect(m).toContain("Quinta-feira, 17 de setembro, às 00:40");
   });
 
   it("names each leg and prices it, so the total adds up on the page", () => {
@@ -96,6 +98,12 @@ describe("a quote that has more than one leg", () => {
     expect(m).toContain("*Volta*");
     expect(m.match(/\$40/g)).toHaveLength(2);
     expect(m).toContain("Total: $80");
+  });
+
+  it("leaves a date lower case where it sits inside a sentence", () => {
+    const m = buildMessage("reminder", q, q.trips[0], "L", S, "pt", { when: "tomorrow" });
+    expect(m).toContain("terça-feira");
+    expect(m).not.toContain("Terça-feira");
   });
 
   it("says it in the customer's own language", () => {

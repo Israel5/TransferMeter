@@ -4,10 +4,16 @@
 // sandboxed page that cannot fetch anything.
 import { fmt, dur, niceDate, countList, customerRoute, shortName } from "./quote";
 import { wordsFor } from "./words";
+import { mapsLink } from "./links";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "./types";
 import type { CustomerView, Quote, Settings } from "./types";
 
 const WIN_ANSI: Record<number, number> = {0x2014:0x97,0x2013:0x96,0x2018:0x91,0x2019:0x92,0x201C:0x93,0x201D:0x94,0x2026:0x85,0x2022:0x95,0x20AC:0x80};
+/** A URL inside a PDF string. Only three characters can end it early. */
+function pdfUri(url: string){
+  return String(url).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
 function pdfText(str: string){
   let out="";
   for(const ch of String(str)){
@@ -57,6 +63,12 @@ export function buildPDF(v: CustomerView): Uint8Array {
       label: leg.k === "ret" ? "Return" : "Outbound",
       date: leg.d, time: leg.h,
       stops: (leg.s ?? []).map((name) => ({ name })),
+      // Which of those may be linked to a map. Taken from the payload, never
+      // recomputed: by this point the driver's base is already wearing its role
+      // name, and a fresh guess would read it as an address and link to it. A
+      // payload that does not say -- a link sent before this existed -- links
+      // nothing, which is the safe way to be wrong.
+      real: leg.r ?? (leg.s ?? []).map(() => false),
       legKm: leg.m ?? [],
       paxKm: leg.pkm ?? leg.km ?? 0,
       paxMins: leg.pmn ?? leg.mn ?? 0,
@@ -69,6 +81,10 @@ export function buildPDF(v: CustomerView): Uint8Array {
 
   const W=612, H=792, M=54;
   const PAGES: string[][] = []; let ops: string[] = []; let y = 0;
+  /* Where each address sits on each page, so it can be made clickable. A PDF
+   * link is not part of the drawing: it is a rectangle recorded against the
+   * page and turned into an annotation when the file is assembled. */
+  const LINKS: { url: string; x: number; y: number; w: number; h: number }[][] = [];
 
   /* palette — the app's instrument colours, tuned for paper */
   const SLATE=[0.086,0.125,0.180], AMBER=[0.784,0.545,0.145],
@@ -140,7 +156,7 @@ export function buildPDF(v: CustomerView): Uint8Array {
   /* ---- page furniture ---- */
   const BAND=98;
   function startPage(first:boolean){
-    ops=[]; PAGES.push(ops);
+    ops=[]; PAGES.push(ops); LINKS.push([]);
     rect(0,H-BAND,W,BAND,SLATE);
     rect(0,H-BAND-3.2,W,3.2,AMBER);
     if(first){
@@ -203,6 +219,11 @@ export function buildPDF(v: CustomerView): Uint8Array {
       circle(railX, cy, isEnd?3.4:3.0, isEnd?SLATE:PAPER);
       if(!isEnd) ring(railX, cy, 3.0, AMBER, 1.3);
       text(st||"\u2014", labelX, ry, {size:9.8});
+      // Only a real address, never the driver's base -- that appears here as
+      // the part it plays in the journey, not as somewhere to be sent.
+      const href = (t.real as boolean[] | undefined)?.[i] ? mapsLink(st) : null;
+      if(href) LINKS[LINKS.length-1].push(
+        {url:href, x:labelX, y:ry-2.6, w:pdfWidth(st,9.8,false,0), h:12.4});
       if(i<stops.length-1 && isFinite(view.legKm[i])){
         text(fmt(view.legKm[i],1)+" km", W-M-16, ry-8.5, {size:8,color:GREY,align:"right"});
       }
@@ -267,6 +288,9 @@ export function buildPDF(v: CustomerView): Uint8Array {
   const pageObj = (i:number) => 3 + i*2;          // page objects at 3,5,7...
   const contObj = (i:number) => 4 + i*2;          // its stream follows
   const fontBase = 3 + nPages*2;
+  // Annotations are numbered after the fonts, so adding them shifts nothing.
+  let nextAnnot = fontBase + 3;
+  const annotIds: number[][] = LINKS.map((list) => list.map(() => nextAnnot++));
   const objs: string[] = [];
   objs.push("<</Type/Catalog/Pages 2 0 R>>");
   objs.push("<</Type/Pages/Kids["+PAGES.map((_,i)=>pageObj(i)+" 0 R").join(" ")+"]/Count "+nPages+">>");
@@ -274,12 +298,23 @@ export function buildPDF(v: CustomerView): Uint8Array {
     const content=page.join("\n");
     objs.push("<</Type/Page/Parent 2 0 R/MediaBox[0 0 "+W+" "+H+"]/Resources<</Font<<"
       +"/F1 "+fontBase+" 0 R /F2 "+(fontBase+1)+" 0 R /F3 "+(fontBase+2)+" 0 R>>>>"
-      +"/Contents "+contObj(i)+" 0 R>>");
+      +"/Contents "+contObj(i)+" 0 R"
+      +((annotIds[i]||[]).length
+          ? "/Annots["+annotIds[i].map((a)=>a+" 0 R").join(" ")+"]" : "")
+      +">>");
     objs.push("<</Length "+content.length+">>\nstream\n"+content+"\nendstream");
   });
   objs.push("<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>");
   objs.push("<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>");
   objs.push("<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Oblique/Encoding/WinAnsiEncoding>>");
+
+  // No /Border: an address reads as somewhere to go without a box drawn round
+  // it, and the box would only spoil the page.
+  LINKS.forEach((list)=>list.forEach((l)=>{
+    objs.push("<</Type/Annot/Subtype/Link/Rect["
+      +n(l.x)+" "+n(l.y)+" "+n(l.x+l.w)+" "+n(l.y+l.h)
+      +"]/Border[0 0 0]/A<</S/URI/URI("+pdfUri(l.url)+")>>>>");
+  }));
 
   let pdf="%PDF-1.4\n";
   const offsets: number[] = [];

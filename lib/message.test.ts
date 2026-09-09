@@ -73,3 +73,17 @@ describe("the document they can keep", () => {
     expect(pdf).toContain("2026-09-01");
   });
 });
+
+describe("which stops a customer may open on a map", () => {
+  // The base is in the payload as the part it plays, not as an address. If the
+  // page or the PDF ever guessed instead of being told, that role name would
+  // become a map search for the driver's home.
+  it("marks the real addresses and never the driver's base", () => {
+    expect(view.t[0].s[0]).not.toContain("Mountain Sights");
+    expect(view.t[0].r).toEqual([false, true, true, false]);
+  });
+
+  it("says so for every stop of every leg", () => {
+    for (const leg of view.t) expect(leg.r).toHaveLength(leg.s.length);
+  });
+});

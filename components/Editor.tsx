@@ -18,11 +18,13 @@ const clock = (d: Date) =>
   d.toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 export function Editor({
-  st, live, set, setTrip, mapsLeg, mapsRoute, quoteText, onSave, onDiscard, onSend, onPdf, onCopyLink, onNewQuote, onBack, flash,
+  st, live, set, setTrip, detailStop, mapsLeg, mapsRoute, quoteText, onSave, onDiscard, onSend, onPdf, onCopyLink, onNewQuote, onBack, flash,
 }: {
   st: AppState; live: boolean;
   set: (patch: Partial<AppState>) => void;
   setTrip: (i: number, patch: Partial<Trip>) => void;
+  /** Replaces a picked stop's text with the place's full address. */
+  detailStop: (placeId: string) => void;
   mapsLeg: (i: number) => string | null;
   mapsRoute: () => string | null;
   quoteText: string;
@@ -59,6 +61,9 @@ export function Editor({
     next[i] = { name: s.text, base: false, placeId: s.placeId,
                 lat: hit?.lat ?? coords?.lat, lng: hit?.lng ?? coords?.lng };
     patchStops(next);
+    // Then the full address, postal code and all, once Google has said what it
+    // is. The suggestion's text is shown meanwhile so nothing waits on this.
+    if (s.placeId) detailStop(s.placeId);
   }
 
   const dirty = hasUnsavedChanges(st);

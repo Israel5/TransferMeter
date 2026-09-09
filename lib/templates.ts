@@ -55,6 +55,19 @@ export function spokenDate(iso: string, lang: Lang) {
     { weekday: "long", day: "numeric", month: "long" });
 }
 
+/* A capital letter when the phrase starts with one.
+ *
+ * Portuguese and French write weekdays in lower case -- quinta-feira, jeudi --
+ * which is correct inside a sentence and reads as a typo at the head of a line.
+ * Applied where a date opens a line, not inside spokenDate itself, because the
+ * same date is also written mid-sentence ("do seu transfer amanhã, quinta...")
+ * where the lower case is the right form.
+ */
+export function opensALine(text: string): string {
+  const t = String(text ?? "");
+  return t ? t[0].toUpperCase() + t.slice(1) : t;
+}
+
 /* ---------- the defaults ---------- */
 
 export const DEFAULTS: Record<MessageKind, Record<Lang, string>> = {
@@ -288,7 +301,7 @@ function journeyBlock(q: Quote, lang: Lang): string {
          Number(t.price) ? `$${fmt(t.price, 0)}` : ""].filter(Boolean).join(" \u00b7 ")
       : "";
 
-    return [head, route, dateAndTime(t.date ?? "", t.time ?? "", lang)]
+    return [head, route, opensALine(dateAndTime(t.date ?? "", t.time ?? "", lang))]
       .filter(Boolean).join("\n");
   }).filter(Boolean).join("\n\n");
 }

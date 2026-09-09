@@ -43,14 +43,38 @@ export async function autocomplete(key: string, q: string, country: string) {
     .map((s: any) => ({ placeId: s.placePrediction.placeId, text: s.placePrediction.text?.text ?? "" }));
 }
 
+/* The place written out in full: its name, its street, and its postal code.
+ *
+ * The postal code is the point. Google's suggestion text stops at the city, and
+ * a city has more than one Rue Sherbrooke -- the code is the part a customer can
+ * check at a glance and the part that says which one was meant.
+ *
+ * The place's own name goes in front only when the address does not already
+ * carry it. A house number is its own name, so "70 Rue Saint-Ferdinand #103"
+ * is not written twice; a school is not, so "École Sainte-Béatrice" survives
+ * instead of being replaced by the street it stands on.
+ */
+export function namedAddress(displayName: string, formatted: string): string {
+  const name = String(displayName ?? "").trim();
+  const addr = String(formatted ?? "").trim();
+  if (!addr) return name;
+  if (!name || addr.toLowerCase().includes(name.toLowerCase())) return addr;
+  return `${name}, ${addr}`;
+}
+
 export async function placeLocation(key: string, placeId: string) {
   const r = await fetch(
-    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?fields=location,formattedAddress`,
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`
+      + `?fields=location,formattedAddress,displayName`,
     { headers: { "X-Goog-Api-Key": key } },
   );
   const d = await r.json();
   if (!r.ok) throw new MapsError(d?.error?.message ?? "place lookup failed", r.status);
-  return { lat: d.location?.latitude, lng: d.location?.longitude, address: d.formattedAddress ?? "" };
+  return {
+    lat: d.location?.latitude,
+    lng: d.location?.longitude,
+    address: namedAddress(d.displayName?.text ?? "", d.formattedAddress ?? ""),
+  };
 }
 
 export async function route(key: string, stops: unknown[], departureTime?: string | null) {

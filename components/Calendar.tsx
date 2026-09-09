@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { fmt, money, legCost, toL100, niceDate, shortName } from "@/lib/quote";
 import { NumberField } from "./NumberField";
-import { customerStops, wazeLink } from "@/lib/waze";
+import { customerStops, wazeLink } from "@/lib/links";
 import { waLink } from "@/lib/whatsapp";
 import type { Quote, Settings, Stop } from "@/lib/types";
 

@@ -173,8 +173,13 @@ export function customerRoute(
     if (!st.base) return String(st.name || "—");
     return i === 0 ? labels.startPoint : i === stops.length - 1 ? labels.endPoint : labels.startPoint;
   });
+  // Which of those are real addresses the customer can look up, and which are
+  // the driver's own base wearing a role name. Said here rather than guessed
+  // from the text later: a customer's page must never turn "where I start from"
+  // into a map search for the driver's home.
+  const real = stops.map((st) => !st.base && !!String(st.name || "").trim());
   const km = legKm.map((n) => Math.round((Number(n) || 0) * 10) / 10);
-  return { stops: named, legKm: km, km: km.reduce((a, b) => a + b, 0) };
+  return { stops: named, real, legKm: km, km: km.reduce((a, b) => a + b, 0) };
 }
 
 /* ---------- schedule ---------- */

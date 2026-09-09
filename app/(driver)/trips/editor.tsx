@@ -13,7 +13,7 @@ import type { Quote } from "@/lib/types";
  *  reload after that and you are still on the quote you were writing, which is
  *  the whole point of the page having one. */
 export function QuoteEditor() {
-  const { st, setSt, persist, live, set, setTrip, mapsLeg, mapsRoute, flash,
+  const { st, setSt, persist, live, set, setTrip, detailStop, mapsLeg, mapsRoute, flash,
           saveNow, savePdf, sendQuote, copyLink } = useApp();
   const router = useRouter();
 
@@ -25,7 +25,7 @@ export function QuoteEditor() {
   };
 
   return (
-    <Editor st={st} live={live} set={set} setTrip={setTrip}
+    <Editor st={st} live={live} set={set} setTrip={setTrip} detailStop={detailStop}
             mapsLeg={mapsLeg} mapsRoute={mapsRoute}
             quoteText={draftMessage(st)}
             onSave={async () => { settle(await saveNow()); }}

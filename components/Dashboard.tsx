@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { fmt, dur, scheduleFor, shortDay, shortName, finishedAt, isoDay, toTrip } from "@/lib/quote";
-import { customerStops, wazeLink } from "@/lib/waze";
+import { customerStops, wazeLink } from "@/lib/links";
 import { waPretty } from "@/lib/whatsapp";
 import type { Lang, Quote, SavedTrip, Settings, Trip } from "@/lib/types";
 

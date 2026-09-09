@@ -141,9 +141,63 @@ function useAppState() {
     });
   }, [persist]);
 
+  /* An address picked from the list, filled out in full.
+   *
+   * Google's suggestion text stops at the city -- "70 Rue Saint-Ferdinand,
+   * Montreal, QC, Canada" -- and one street name can repeat across a city. The
+   * place's own formatted address carries the postal code, which is the part a
+   * customer can check at a glance and the part that tells two Rue Sherbrookes
+   * apart.
+   *
+   * Fetched after the pick, so typing never waits on it, and applied by placeId
+   * rather than by position: the stop may have been moved or removed by the
+   * time Google answers. If the lookup fails the suggestion's own text stands.
+   */
+  const detailStop = useCallback(async (placeId: string) => {
+    if (!placeId) return;
+    try {
+      const r = await fetch(`/api/place?id=${encodeURIComponent(placeId)}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const d = await r.json();
+      const address = String(d?.address ?? "").trim();
+      if (!address) return;
+      const lat = Number(d?.lat), lng = Number(d?.lng);
+
+      setSt((prev) => {
+        let touched = false;
+        const trips = prev.trips.map((t) => {
+          let hit = false;
+          const stops = t.stops.map((stop) => {
+            if (stop.placeId !== placeId || stop.name === address) return stop;
+            hit = touched = true;
+            return {
+              ...stop, name: address,
+              lat: Number.isFinite(lat) ? lat : stop.lat,
+              lng: Number.isFinite(lng) ? lng : stop.lng,
+            };
+          });
+          return hit ? { ...t, stops } : t;
+        });
+        if (!touched) return prev;
+        const next = { ...prev, trips };
+        persist(next);
+        return next;
+      });
+    } catch { /* the suggestion's own text stands */ }
+  }, [persist]);
+
   /* ---------- Google distances ---------- */
+  // Keyed on what actually decides the route, not on the whole stop. Google is
+  // asked by placeId when there is one, by coordinates otherwise, and only by
+  // the written address as a last resort -- so rewriting an address into its
+  // fuller form, same place, must not buy a second answer to the same question.
   const wantRoutes = useMemo(
-    () => JSON.stringify(st.trips.map((t) => [t.stops, t.date, t.time])),
+    () => JSON.stringify(st.trips.map((t) => [
+      t.stops.map((s) => s.placeId
+        || (Number.isFinite(s.lat) && Number.isFinite(s.lng) ? `${s.lat},${s.lng}` : "")
+        || s.name),
+      t.date, t.time,
+    ])),
     [st.trips],
   );
   useEffect(() => {
@@ -416,7 +470,7 @@ function useAppState() {
 
 
   return {
-    st, setSt, set, setTrip, live, booted, signedIn, store, flash, say,
+    st, setSt, set, setTrip, detailStop, live, booted, signedIn, store, flash, say,
     email, setEmail, password, setPassword, signInMsg, setSignInMsg,
     persist, persistNow, mapsLeg, mapsRoute,
     saveNow, patchQuote, nudge, markPaid, doDelete, savePdf, sendQuote, remind,

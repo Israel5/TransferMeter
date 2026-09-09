@@ -4,7 +4,7 @@ import { useState } from "react";
 import { fmt, money, fuelUsed, quoteTotals, toL100, shortName, shortDay } from "@/lib/quote";
 import { owedOn, tipTotal } from "@/lib/state";
 import { NumberField } from "./NumberField";
-import { customerStops as stopsOf, wazeLink } from "@/lib/waze";
+import { customerStops as stopsOf, wazeLink } from "@/lib/links";
 import { waLink, waHandle, waPretty } from "@/lib/whatsapp";
 import type { Actual, Quote, Settings } from "@/lib/types";
 

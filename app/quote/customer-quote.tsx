@@ -1,5 +1,7 @@
 "use client";
 
+import { mapsLink } from "@/lib/links";
+
 import { useEffect, useMemo, useState } from "react";
 import { fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/api";
 import { buildPDF } from "@/lib/pdf";
@@ -14,6 +16,9 @@ import { slugify } from "@/lib/quote";
 
 type Leg = {
   k: string; d: string; h: string; s: string[]; m: number[];
+  /** Which stops are real addresses rather than the driver's base, and so
+   *  may be linked to a map. Absent on links sent before this existed. */
+  r?: boolean[];
   km: number; mn: number; pr: number;
   /** The part with the passenger aboard. Absent on links sent before this. */
   pkm?: number; pmn?: number;
@@ -71,6 +76,7 @@ const T = {
     thanksYes: "Obrigado! Sua viagem está confirmada.",
     thanksNo: "Tudo bem — já fiquei sabendo.",
     sending: "Enviando…", stops: "Trajeto", pdf: "Baixar em PDF",
+    openMap: "Ver no mapa",
     yourRide: "Sua viagem", totalDriven: "Total rodado pelo motorista",
     failed: "Não consegui registrar sua resposta. Tenta de novo?",
     lockedNote: "Você já respondeu este orçamento, então os dados estão fechados.",
@@ -91,6 +97,7 @@ const T = {
     thanksYes: "Thank you — your trip is confirmed.",
     thanksNo: "No problem — I've been told.",
     sending: "Sending…", stops: "Route", pdf: "Download as PDF",
+    openMap: "See it on a map",
     yourRide: "Your journey", totalDriven: "Total driven by the driver",
     failed: "That didn't go through. Please try again.",
     lockedNote: "You've already answered this quote, so the details are closed.",
@@ -111,6 +118,7 @@ const T = {
     thanksYes: "Merci — votre trajet est confirmé.",
     thanksNo: "Pas de souci — j'en suis informé.",
     sending: "Envoi…", stops: "Trajet", pdf: "Télécharger en PDF",
+    openMap: "Voir sur la carte",
     yourRide: "Votre trajet", totalDriven: "Distance totale parcourue",
     failed: "L'envoi n'a pas fonctionné. Réessayez.",
     lockedNote: "Vous avez déjà répondu à ce devis, les informations sont donc fermées.",
@@ -291,7 +299,17 @@ export function CustomerQuote({ token }: { token: string }) {
               <ol className="cq-route">
                 {(leg.s ?? []).map((name, n) => (
                   <li key={n} className={n === 0 || n === leg.s.length - 1 ? "end" : ""}>
-                    <span className="cq-name">{name}</span>
+                    {/* An address opens on a map, so it can be checked before it
+                        is agreed to. The driver's base is a role here, not an
+                        address, and never becomes a link. */}
+                    {leg.r?.[n] && mapsLink(name) ? (
+                      <a className="cq-name cq-map" href={mapsLink(name)!}
+                         target="_blank" rel="noreferrer noopener" title={L.openMap}>
+                        {name}
+                      </a>
+                    ) : (
+                      <span className="cq-name">{name}</span>
+                    )}
                     {n < leg.s.length - 1 && Number.isFinite(leg.m?.[n]) && (
                       <span className="cq-gap">{km(leg.m[n])}</span>
                     )}
