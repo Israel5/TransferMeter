@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StopRow, type Suggestion } from "./StopRow";
 import { CounterGroup } from "./Counters";
+import { SeatMap } from "./SeatMap";
 import { Meter } from "./Meter";
 import { NumberField } from "./NumberField";
 import { fmt, dur, niceDate, legInfo, scheduleFor, tripTotals, shortName } from "@/lib/quote";
@@ -248,6 +249,13 @@ export function Editor({
                             onChange={(k, d) => set({ pax: bump(st.pax, k, d) })} />
               <CounterGroup title="Child seats I need to bring" keys={GEAR_KEYS} store={st.gear}
                             onChange={(k, d) => set({ gear: bump(st.gear, k, d) })} />
+              {/* Usually the customer's answer, arriving with their request.
+                  It is editable here anyway, because the common way it changes
+                  is a phone call -- "can you put it behind me instead" -- and
+                  because a map that only watches would let a lowered count
+                  leave a seat strapped in with nothing to explain it. */}
+              <SeatMap gear={st.gear} slots={st.slots ?? {}} lang={st.lang}
+                       onChange={(slots) => set({ slots })} />
               <CounterGroup title="Luggage" keys={BAG_KEYS} store={st.bags}
                             onChange={(k, d) => set({ bags: bump(st.bags, k, d) })} />
               <p className="warn-line" hidden={!warn}>{warn}</p>

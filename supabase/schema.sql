@@ -153,6 +153,38 @@ create policy "owner owns learned" on public.learned
 revoke all on public.quotes, public.settings, public.learned, public.config from anon;
 revoke all on all tables in schema public from anon;
 
+-- ------------------------------------------------- child seat places -------
+-- Where a child seat is strapped in, as opposed to how many there are.
+--
+-- Two rules, and both are here rather than in the browser because a browser
+-- is only where the honest ones answer. A place must be one the car actually
+-- has -- the outboard pair of the middle row, since the third row has no
+-- tether and the middle of the bench is too narrow to take one beside
+-- another. And a place may only hold a device the gear counts already paid
+-- for, so lowering a count to zero takes its seat out of the car rather than
+-- leaving it strapped in with nothing to explain it. Anything else is
+-- dropped rather than argued with, the same way the counts are.
+--
+-- That second rule is what keeps "two boosters" and "a booster on each side"
+-- from ever becoming two different answers to the same question.
+create or replace function public.clean_slots(slots jsonb, gear jsonb)
+returns jsonb
+language sql
+immutable
+as $$
+  select coalesce(jsonb_object_agg(k, v), '{}'::jsonb)
+    from (
+      select k, v, row_number() over (partition by v order by k) as nth
+        from jsonb_each_text(case when jsonb_typeof(slots) = 'object'
+                                  then slots else '{}'::jsonb end) as e(k, v)
+       where k in ('2L', '2R')
+         and v in ('infantSeat', 'carSeat', 'booster')
+    ) placed
+   -- The gear here may be a stranger's unchecked object, so the count is read
+   -- only when it looks like a number at all.
+   where nth <= case when (gear ->> v) ~ '^[0-9]+$' then (gear ->> v)::int else 0 end
+$$;
+
 -- ------------------------------------------------- customer asks for one ---
 -- A stranger may create a request and nothing else. They cannot choose the
 -- price, the status, or whose books it lands in — this function decides all
@@ -267,7 +299,11 @@ begin
     'trips',    legs,
     'pax',      case when jsonb_typeof(payload->'pax')  = 'object' then payload->'pax'  else '{}'::jsonb end,
     'gear',     case when jsonb_typeof(payload->'gear') = 'object' then payload->'gear' else '{}'::jsonb end,
-    'bags',     case when jsonb_typeof(payload->'bags') = 'object' then payload->'bags' else '{}'::jsonb end
+    'bags',     case when jsonb_typeof(payload->'bags') = 'object' then payload->'bags' else '{}'::jsonb end,
+    'slots',    public.clean_slots(
+                  payload->'slots',
+                  case when jsonb_typeof(payload->'gear') = 'object'
+                       then payload->'gear' else '{}'::jsonb end)
   );
 
   insert into public.quotes (owner, status, data)
@@ -473,6 +509,14 @@ begin
                    'pax',  coalesce(nullif(clean -> 'pax',  '{}'::jsonb), data -> 'pax'),
                    'gear', coalesce(nullif(clean -> 'gear', '{}'::jsonb), data -> 'gear'),
                    'bags', coalesce(nullif(clean -> 'bags', '{}'::jsonb), data -> 'bags'),
+                   -- Re-checked whether or not this call sent any, because a
+                   -- save that only lowers a gear count still has to take the
+                   -- seat it paid for back out of the car.
+                   'slots', public.clean_slots(
+                              case when counts ? 'slots' then counts -> 'slots'
+                                   else coalesce(data -> 'slots', '{}'::jsonb) end,
+                              coalesce(nullif(clean -> 'gear', '{}'::jsonb),
+                                       data -> 'gear', '{}'::jsonb)),
                    'customerEditedAt', to_jsonb(now())
                  ),
          updated_at = now()
@@ -488,7 +532,8 @@ begin
   return jsonb_build_object('xc', jsonb_build_object(
     'pax',  coalesce(q.data -> 'pax',  '{}'::jsonb),
     'gear', coalesce(q.data -> 'gear', '{}'::jsonb),
-    'bags', coalesce(q.data -> 'bags', '{}'::jsonb)));
+    'bags',  coalesce(q.data -> 'bags',  '{}'::jsonb),
+    'slots', coalesce(q.data -> 'slots', '{}'::jsonb)));
 end $$;
 
 revoke all on function public.update_quote_counts(text, jsonb) from public;

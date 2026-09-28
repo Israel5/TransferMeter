@@ -89,6 +89,8 @@ export type QuoteContent = {
   lang: Lang;
   trips: SavedTrip[];
   pax: Counts; gear: Counts; bags: Counts;
+  /** Absent on quotes stored before the seat map existed. */
+  slots?: Slots;
   totalKm: number; cost: number; price: number; mins: number; keep: number;
 };
 
@@ -124,7 +126,7 @@ export type CustomerView = {
   b?: string; p?: string; w?: string; n?: string; c?: string;
   l?: Lang; savedAt?: string;
   t?: CustomerViewLeg[];
-  xc?: { pax?: Counts; gear?: Counts; bags?: Counts };
+  xc?: { pax?: Counts; gear?: Counts; bags?: Counts; slots?: Slots };
   seats?: number;
   tot?: number;
 };
@@ -144,6 +146,23 @@ export const PAX_KEYS: [string, string][] = [
 export const GEAR_KEYS: [string, string][] = [
   ["infantSeat", "Infant seat"], ["carSeat", "Car seat"], ["booster", "Booster"],
 ];
+/* Where a child seat goes, as opposed to how many there are.
+ *
+ * `gear` says what to bring; this says which place it is strapped into, and
+ * the two cannot disagree because a slot may only ever hold a device the
+ * counts already asked for. Only the outboard places of the middle row are
+ * here: the third row has nothing to tether to, and the middle of the bench
+ * is too narrow to take a seat beside another one. Naming them by row and
+ * side leaves room for a car with different places, without renumbering. */
+export type SlotId = "2L" | "2R";
+export const SLOT_IDS: SlotId[] = ["2L", "2R"];
+
+/** A slot with nothing in it is absent, not null: an empty object is "no
+ *  preference", which is a complete answer and not a missing one. */
+export type Slots = Partial<Record<SlotId, string>>;
+
+export const emptySlots = (): Slots => ({});
+
 export const BAG_KEYS: [string, string][] = [
   ["checked", "Suitcases"], ["carry", "Carry-on"], ["backpack", "Backpacks"],
   ["stroller", "Stroller"], ["crib", "Travel crib"], ["other", "Other items"],

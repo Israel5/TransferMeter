@@ -146,7 +146,7 @@ async function withCustomerEdits(
     if (!theirs) return q;
     if (q.customerEditedAt && q.customerEditedAt >= theirs) return q;   // already seen
     return { ...q, pax: r.pax ?? q.pax, gear: r.gear ?? q.gear, bags: r.bags ?? q.bags,
-             customerEditedAt: theirs };
+             slots: r.slots ?? q.slots, customerEditedAt: theirs };
   });
   return { merged, stored: remote };
 }
@@ -201,6 +201,7 @@ export async function push(sb: SupabaseClient, owner: string, st: AppState) {
   // actually holds the generation it is editing.
   const draft = {
     trips: st.trips, active: st.active, pax: st.pax, gear: st.gear, bags: st.bags,
+    slots: st.slots,
     customer: st.customer, contact: st.contact, notes: st.notes,
     quoteNo: st.quoteNo, editingId: st.editingId, lang: st.lang,
   };

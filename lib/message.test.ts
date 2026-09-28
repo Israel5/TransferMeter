@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { customerPayload } from "./message";
+import { customerPayload, seatPlaces } from "./message";
 import { buildPDF } from "./pdf";
 import type { Quote, Settings } from "./types";
 
@@ -85,5 +85,33 @@ describe("which stops a customer may open on a map", () => {
 
   it("says so for every stop of every leg", () => {
     for (const leg of view.t) expect(leg.r).toHaveLength(leg.s.length);
+  });
+});
+
+/* Which door to open.
+ *
+ * A count says to bring two seats; only this says which side each one goes.
+ * It is the one part of the booking a stepper could never carry, so it is the
+ * part most worth pinning down. */
+describe("where the child seats go", () => {
+  it("names the side for each one, in the customer's language", () => {
+    expect(seatPlaces({ "2L": "carSeat", "2R": "booster" },
+                      { carSeat: 1, booster: 1 }, "pt"))
+      .toBe("Esquerda: cadeirinha · Direita: booster");
+    expect(seatPlaces({ "2R": "infantSeat" }, { infantSeat: 1 }, "en"))
+      .toBe("Right: infant seat");
+  });
+
+  it("says nothing when no side was chosen, rather than saying nothing was", () => {
+    expect(seatPlaces({}, { booster: 1 }, "pt")).toBe("");
+    expect(seatPlaces(undefined, { booster: 1 }, "en")).toBe("");
+  });
+
+  // A stale draft can hold a placement whose count has since gone to zero.
+  // The database drops those; so must the line the driver loads the car from.
+  it("ignores a seat the counts no longer pay for", () => {
+    expect(seatPlaces({ "2L": "carSeat", "2R": "booster" },
+                      { carSeat: 1, booster: 0 }, "en"))
+      .toBe("Left: car seat");
   });
 });

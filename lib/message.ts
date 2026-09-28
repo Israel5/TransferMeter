@@ -1,8 +1,31 @@
 import { fmt, dur, niceDate, countList, customerRoute, shortName, tripTotals } from "./quote";
 import { wordsFor } from "./words";
-import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "./types";
+import { PAX_KEYS, GEAR_KEYS, BAG_KEYS, SLOT_IDS } from "./types";
 import type { AppState } from "./state";
-import type { Quote, Settings } from "./types";
+import type { Counts, Lang, Quote, Settings, Slots } from "./types";
+
+/** Which side each child seat is strapped into, in the driver's own words.
+ *
+ *  This is the whole reason the customer is shown a picture of the car: a
+ *  count says to bring two seats, and only this says which door to open. Left
+ *  and right are the customer's, which is also the driver's -- both are
+ *  facing forward. Silence means they had no preference, and silence is what
+ *  it prints, because a line saying "no preference" is a line to read at 5am
+ *  for nothing. */
+export function seatPlaces(slots: Slots | undefined, gear: Counts, lang: Lang): string {
+  const W = wordsFor(lang);
+  const said = SLOT_IDS
+    .map((id) => {
+      const d = slots?.[id];
+      // A placement the counts no longer pay for is not a placement; the
+      // database drops these too, but a stale local draft may still hold one.
+      if (!d || !(gear?.[d] > 0)) return null;
+      const name = W[d];
+      return `${W[id]}: ${Array.isArray(name) ? name[0] : name}`;
+    })
+    .filter(Boolean);
+  return said.join(" · ");
+}
 
 /** The quote as a message, for the box the driver reads and copies. */
 export function draftMessage(st: AppState): string {
@@ -28,6 +51,8 @@ export function draftMessage(st: AppState): string {
   const b = countList(st.bags, BAG_KEYS, W as any);
   if (p) parts.push(`${W.pax}: ${p}`);
   if (g) parts.push(`${W.gear}: ${g}`);
+  const where = seatPlaces(st.slots, st.gear, st.lang);
+  if (where) parts.push(`${W.seatSide}: ${where}`);
   if (b) parts.push(`${W.bags}: ${b}`);
   if (p || g || b) parts.push("");
 
@@ -72,7 +97,8 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
     }),
     // The counts as numbers, once. The customer's page words them itself, so a
     // correction there cannot leave a stale sentence behind.
-    xc: { pax: { ...(q.pax ?? {}) }, gear: { ...(q.gear ?? {}) }, bags: { ...(q.bags ?? {}) } },
+    xc: { pax: { ...(q.pax ?? {}) }, gear: { ...(q.gear ?? {}) }, bags: { ...(q.bags ?? {}) },
+          slots: { ...(q.slots ?? {}) } },
     seats: s.seats ?? 7,
     tot: (q.trips ?? []).reduce((n, t) => n + (t.price ?? 0), 0),
   };

@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 // use to a form that only needs a reachable number.
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/min";
 import { AddressField } from "./address-field";
+import { SeatMap } from "@/components/SeatMap";
+import { emptySlots, type Slots } from "@/lib/types";
 import "react-phone-number-input/style.css";
 
 /* The page a customer lands on to ask for a transfer.
@@ -125,6 +127,9 @@ export default function RequestQuote() {
   const [counts, setCounts] = useState<Record<string, Counts>>({
     pax: { adults: 2, children: 0, infants: 0 }, gear: {}, bags: {},
   });
+  // Which side each child seat goes. Empty is a complete answer -- "wherever
+  // you like" -- so nothing below waits on it.
+  const [slots, setSlots] = useState<Slots>(emptySlots());
 
   // Passing the challenge is exchanged for a short-lived cookie, so the
   // address lookup below can be paid for without leaving it open to anyone.
@@ -206,7 +211,7 @@ export default function RequestQuote() {
           payload: {
             customer: name.trim(), contact: contact.trim(), lang,
             note: note.trim(), trips,
-            pax: counts.pax, gear: counts.gear, bags: counts.bags,
+            pax: counts.pax, gear: counts.gear, bags: counts.bags, slots,
           },
         }),
       });
@@ -389,6 +394,10 @@ export default function RequestQuote() {
                   </span>
                 </div>
               ))}
+              {key === "gear" && (
+                <SeatMap gear={counts.gear ?? {}} slots={slots} lang={lang}
+                         onChange={setSlots} />
+              )}
             </div>
           ))}
         </section>
