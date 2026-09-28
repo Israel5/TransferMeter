@@ -1,5 +1,5 @@
-import { DEFAULTS, emptyPax, emptyGear, emptyBags } from "./types";
-import type { Counts, Lang, Quote, QuoteContent, SavedTrip, Settings, Stop, Trip } from "./types";
+import { DEFAULTS, emptyPax, emptyGear, emptyBags, emptySlots } from "./types";
+import type { Counts, Lang, Quote, QuoteContent, SavedTrip, Settings, Slots, Stop, Trip } from "./types";
 import { tripTotals, grandTotals, finishedAt } from "./quote";
 
 export type AppState = {
@@ -8,6 +8,8 @@ export type AppState = {
   trips: Trip[];
   active: number;
   pax: Counts; gear: Counts; bags: Counts;
+  /** Which side each child seat goes, when the customer said. */
+  slots: Slots;
   customer: string; contact: string; notes: string;
   quoteNo: string;
   editingId: number | null;
@@ -43,7 +45,7 @@ export function initialState(): AppState {
   return {
     settings, learned: {},
     trips: [newTrip(settings)], active: 0,
-    pax: emptyPax(), gear: emptyGear(), bags: emptyBags(),
+    pax: emptyPax(), gear: emptyGear(), bags: emptyBags(), slots: emptySlots(),
     customer: "", contact: "", notes: "", quoteNo: "",
     editingId: null, quotes: [], lang: "pt",
   };
@@ -76,7 +78,7 @@ export function snapshot(st: AppState): QuoteContent {
         actual: t.actual,
       };
     }),
-    pax: { ...st.pax }, gear: { ...st.gear }, bags: { ...st.bags },
+    pax: { ...st.pax }, gear: { ...st.gear }, bags: { ...st.bags }, slots: { ...st.slots },
     totalKm: g.total, cost: g.cost, price: g.price, mins: g.mins, keep: g.price - g.cost,
   };
 }
@@ -161,6 +163,7 @@ export function loadQuote(st: AppState, id: number): AppState {
     customer: q.customer || "", contact: q.contact || "", notes: q.notes || "",
     quoteNo: q.quoteNo || "", editingId: q.id,
     pax: { ...emptyPax(), ...q.pax }, gear: { ...emptyGear(), ...q.gear }, bags: { ...emptyBags(), ...q.bags },
+    slots: { ...(q.slots ?? {}) },
     lang: q.lang || st.lang,
   };
 }
@@ -170,7 +173,7 @@ export function newQuote(st: AppState): AppState {
     ...st,
     trips: [newTrip(st.settings)], active: 0,
     customer: "", contact: "", notes: "", quoteNo: "", editingId: null,
-    pax: emptyPax(), gear: emptyGear(), bags: emptyBags(),
+    pax: emptyPax(), gear: emptyGear(), bags: emptyBags(), slots: emptySlots(),
   };
 }
 
@@ -179,7 +182,7 @@ export function newQuote(st: AppState): AppState {
  *  between one render and the next and would report a change that is not one. */
 const shapeOf = (st: AppState) => JSON.stringify({
   customer: st.customer.trim(), contact: st.contact.trim(), notes: st.notes.trim(),
-  lang: st.lang, pax: st.pax, gear: st.gear, bags: st.bags,
+  lang: st.lang, pax: st.pax, gear: st.gear, bags: st.bags, slots: st.slots,
   trips: st.trips.map((t) => ({
     label: t.label, date: t.date, time: t.time,
     price: t.priceOverride,
@@ -190,6 +193,7 @@ const shapeOf = (st: AppState) => JSON.stringify({
 const savedShapeOf = (q: Quote) => JSON.stringify({
   customer: (q.customer ?? "").trim(), contact: (q.contact ?? "").trim(),
   notes: (q.notes ?? "").trim(), lang: q.lang, pax: q.pax, gear: q.gear, bags: q.bags,
+  slots: q.slots ?? {},
   trips: (q.trips ?? []).map((t) => ({
     label: t.label, date: t.date, time: t.time,
     price: t.price,

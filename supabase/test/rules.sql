@@ -110,6 +110,76 @@ begin
     failed := failed + 1; raise warning 'the counts did not survive: % %', got->'pax', got->'bags';
   end if;
 
+  -- ------------------------------------------ where the child seats go -----
+  -- The map in the browser prunes as you go, but the browser is only where
+  -- the honest ones answer. These are the rules that hold when it doesn't.
+
+  -- A place the car does not have is dropped, and so is a device that is not
+  -- one of the three.
+  ran := ran + 1;
+  got := public.clean_slots(
+           '{"2L":"carSeat","2M":"booster","3R":"carSeat","2R":"hoverboard"}'::jsonb,
+           '{"carSeat":2,"booster":2}'::jsonb);
+  if got <> '{"2L":"carSeat"}'::jsonb then
+    failed := failed + 1;
+    raise warning 'a place the car has not, or a device it knows not, survived: %', got;
+  end if;
+
+  -- A placement the counts never paid for is dropped: this is the rule that
+  -- keeps the two answers from disagreeing.
+  ran := ran + 1;
+  got := public.clean_slots('{"2L":"carSeat","2R":"booster"}'::jsonb,
+                            '{"carSeat":1,"booster":0}'::jsonb);
+  if got <> '{"2L":"carSeat"}'::jsonb then
+    failed := failed + 1;
+    raise warning 'a seat nobody asked for stayed strapped in: %', got;
+  end if;
+
+  -- Two of a kind asked for is two of a kind placed; the count is a budget,
+  -- not a switch.
+  ran := ran + 1;
+  got := public.clean_slots('{"2L":"booster","2R":"booster"}'::jsonb,
+                            '{"booster":2}'::jsonb);
+  if got <> '{"2L":"booster","2R":"booster"}'::jsonb then
+    failed := failed + 1; raise warning 'two boosters would not both fit: %', got;
+  end if;
+
+  -- A stranger's gear counts are not checked before this runs, so a count
+  -- that is not a number must not take the whole request down with it.
+  ran := ran + 1;
+  got := public.clean_slots('{"2L":"carSeat"}'::jsonb, '{"carSeat":"lots"}'::jsonb);
+  if got <> '{}'::jsonb then
+    failed := failed + 1; raise warning 'a nonsense count placed a seat: %', got;
+  end if;
+
+  -- Nothing said at all is a complete answer, not a broken one.
+  ran := ran + 1;
+  if public.clean_slots(null, '{"carSeat":1}'::jsonb) <> '{}'::jsonb
+     or public.clean_slots('"nope"'::jsonb, '{"carSeat":1}'::jsonb) <> '{}'::jsonb then
+    failed := failed + 1; raise warning 'no preference did not survive as no preference';
+  end if;
+
+  -- End to end: a request carries its places in, and a later save that drops
+  -- the gear takes the seat back out of the car.
+  ran := ran + 1;
+  tok := public.request_quote('{"customer":"Seat Map","contact":"+15140000001",
+    "trips":[{"from":"A","to":"B"}],
+    "pax":{"adults":2,"infants":1},"gear":{"infantSeat":1},
+    "slots":{"2R":"infantSeat","3L":"infantSeat"}}'::jsonb, 'test-secret');
+  select data into got from public.quotes where share_token = tok;
+  if got->'slots' <> '{"2R":"infantSeat"}'::jsonb then
+    failed := failed + 1; raise warning 'the places did not survive the request: %', got->'slots';
+  end if;
+
+  ran := ran + 1;
+  update public.quotes set status = 'sent' where share_token = tok;
+  perform public.update_quote_counts(tok, '{"gear":{"infantSeat":0,"booster":1}}'::jsonb);
+  select data into got from public.quotes where share_token = tok;
+  if got->'slots' <> '{}'::jsonb then
+    failed := failed + 1;
+    raise warning 'lowering the count left a seat strapped in: %', got->'slots';
+  end if;
+
   -- ------------------------------------------- the table refuses it too -----
   -- Belt and braces: whatever writes, a quote without a leg cannot be stored.
   ran := ran + 1;

@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/api";
 import { buildPDF } from "@/lib/pdf";
 import { slugify } from "@/lib/quote";
+import { SeatMap } from "@/components/SeatMap";
+import { emptySlots, type Slots } from "@/lib/types";
 
 /* What a customer sees.
  *
@@ -28,7 +30,7 @@ type Payload = {
   b?: string; p?: string; w?: string; n?: string; c?: string;
   l?: "pt" | "en" | "fr";
   t?: Leg[];
-  xc?: { pax?: Counts; gear?: Counts; bags?: Counts };
+  xc?: { pax?: Counts; gear?: Counts; bags?: Counts; slots?: Slots };
   seats?: number;
   tot?: number;
 };
@@ -158,6 +160,7 @@ export function CustomerQuote({ token }: { token: string }) {
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, Counts>>({});
+  const [draftSlots, setDraftSlots] = useState<Slots>(emptySlots());
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState(false);
   const [saveFail, setSaveFail] = useState(false);
@@ -189,7 +192,10 @@ export function CustomerQuote({ token }: { token: string }) {
   }), [q]);
 
   const seats = q?.seats ?? 7;
-  const heads = (draft.pax?.adults ?? 0) + (draft.pax?.children ?? 0);
+  // A baby occupies a place like anyone else -- the infant seat it rides in
+  // is strapped to one -- so it counts against the car the same way.
+  const heads = (draft.pax?.adults ?? 0) + (draft.pax?.children ?? 0)
+              + (draft.pax?.infants ?? 0);
   const overSeats = editing && heads > seats;
 
   const answer = async (choice: "approved" | "declined") => {
@@ -218,6 +224,7 @@ export function CustomerQuote({ token }: { token: string }) {
 
   const startEdit = () => {
     setDraft(JSON.parse(JSON.stringify(counts)));
+    setDraftSlots({ ...(q?.xc?.slots ?? {}) });
     setSavedNote(false); setSaveFail(false);
     setEditing(true);
   };
@@ -234,8 +241,8 @@ export function CustomerQuote({ token }: { token: string }) {
     if (!token || saving) return;
     setSaving(true); setSaveFail(false);
     try {
-      await updateQuoteCounts(token, draft);
-      setQ((prev) => (prev ? { ...prev, xc: { ...prev.xc, ...draft } } : prev));
+      await updateQuoteCounts(token, { ...draft, slots: draftSlots });
+      setQ((prev) => (prev ? { ...prev, xc: { ...prev.xc, ...draft, slots: draftSlots } } : prev));
       setEditing(false); setSavedNote(true);
     } catch { setSaveFail(true); }
     finally { setSaving(false); }
@@ -358,6 +365,8 @@ export function CustomerQuote({ token }: { token: string }) {
                   );
                 })}
               </dl>
+              <SeatMap gear={counts.gear ?? {}} slots={q?.xc?.slots ?? {}}
+                       lang={q?.l ?? "pt"} />
               {savedNote && <p className="cq-ok">{L.saved}</p>}
               <p className="cq-hint">
                 {answered ? `${L.lockedNote} ${L.callDriver}` : L.editHint}
@@ -382,6 +391,10 @@ export function CustomerQuote({ token }: { token: string }) {
                       </span>
                     </div>
                   ))}
+                  {key === "gear" && (
+                    <SeatMap gear={draft.gear ?? {}} slots={draftSlots}
+                             lang={q?.l ?? "pt"} onChange={setDraftSlots} />
+                  )}
                 </div>
               ))}
 

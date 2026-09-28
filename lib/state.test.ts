@@ -25,7 +25,7 @@ const editing = (q: Quote): AppState => ({
   ...initialState(),
   quotes: [q], editingId: q.id, quoteNo: q.quoteNo,
   customer: q.customer, contact: q.contact, notes: q.notes, lang: q.lang,
-  pax: q.pax, gear: q.gear, bags: q.bags,
+  pax: q.pax, gear: q.gear, bags: q.bags, slots: q.slots ?? {},
   trips: q.trips.map((t) => ({
     legId: t.legId,
     label: t.label, date: t.date, time: t.time, stops: t.stops,
@@ -255,5 +255,44 @@ describe("what a quote still owes you", () => {
     const q = twoLegs("approved");
     q.trips[0].paid = true;
     expect(owedOn(q, S, {})).toBe(0);
+  });
+});
+
+/* The side a child seat goes on has to survive the driver's own editor.
+ *
+ * It arrives from the customer, but everything the driver saves is written
+ * from the editor's state -- so a field the editor drops on the floor is a
+ * field that is gone the first time they open the quote and press save. */
+describe("which side the child seats go", () => {
+  const withSeats = saved({
+    gear: { carSeat: 1, booster: 1 },
+    slots: { "2L": "carSeat", "2R": "booster" },
+  });
+
+  it("survives a save the driver makes for some other reason", () => {
+    const st = editing(withSeats);
+    const r = saveQuote({ ...st, notes: "gate code 4432" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.content.slots).toEqual({ "2L": "carSeat", "2R": "booster" });
+  });
+
+  it("comes back when the quote is opened again", () => {
+    const st = { ...initialState(), quotes: [withSeats] };
+    expect(loadQuote(st, withSeats.id).slots)
+      .toEqual({ "2L": "carSeat", "2R": "booster" });
+  });
+
+  // Moving a seat is a change to the booking, not a re-render: the driver
+  // must be warned before it is thrown away.
+  it("counts as an unsaved change when one is moved", () => {
+    const st = editing(withSeats);
+    expect(hasUnsavedChanges(st)).toBe(false);
+    expect(hasUnsavedChanges({ ...st, slots: { "2L": "booster", "2R": "carSeat" } }))
+      .toBe(true);
+  });
+
+  it("starts a new quote with an empty car", () => {
+    expect(initialState().slots).toEqual({});
   });
 });

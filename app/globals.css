@@ -1436,3 +1436,78 @@ a.cq-map::after{content:"↗";font-size:.72em;opacity:.5;margin-left:.28em;verti
   .cq-detail{flex-direction:column;gap:2px}
   .cq-detail dt{min-width:0}
 }
+
+/* ---------- the seat map: where the child seats go ---------- */
+/* The counts above answer "how many"; this answers "which side". It is the
+   same question the steppers ask, so it borrows their spacing and sits inside
+   the same .cq-group rhythm rather than announcing itself as a new kind of
+   control. */
+.sm{margin-top:26px}
+.sm-h{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.08em;
+  font-size:.72rem;font-weight:600;color:var(--ink-2);margin:0 0 10px;
+}
+.sm-car{display:flex;justify-content:center;padding:4px 0 2px}
+/* Tall and narrow already; capping the width keeps it from eating a phone
+   screen, and the height follows from the viewBox. */
+.sm-svg{width:100%;max-width:208px;height:auto;overflow:visible;touch-action:manipulation}
+
+.sm-body{fill:var(--surface-2);stroke:var(--line-2);stroke-width:1.5}
+.sm-glass{fill:color-mix(in srgb,var(--muted) 16%,transparent)}
+.sm-tyre rect{fill:color-mix(in srgb,var(--ink) 28%,transparent)}
+.sm-wheel{fill:none;stroke:var(--muted);stroke-width:2.5}
+
+.sm-seat rect{fill:var(--surface);stroke:var(--line-2);stroke-width:1.5}
+.sm-seat.fixed rect{fill:color-mix(in srgb,var(--muted) 12%,transparent)}
+/* The places that cannot take one are still places: drawn, but plainly not
+   on offer. Leaving them out would draw a different car. */
+.sm-seat.off rect{
+  fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:4 4;
+}
+
+.sm-seat.live.empty rect{stroke:var(--line-2)}
+.sm-seat.live:not(.idle){cursor:pointer}
+.sm-seat.live:not(.idle):hover rect{stroke:var(--accent)}
+.sm-seat.live:not(.idle):focus-visible{outline:none}
+.sm-seat.live:not(.idle):focus-visible rect{stroke:var(--focus);stroke-width:2.5}
+.sm-seat.live.idle .sm-plus{display:none}
+.sm-seat.live.idle rect{opacity:.55}
+.sm-plus rect{fill:var(--muted);stroke:none}
+.sm-seat.live:hover .sm-plus rect{fill:var(--accent)}
+
+.sm-seat.full rect{fill:color-mix(in srgb,var(--accent) 14%,var(--surface));stroke:var(--accent)}
+.sm-seat.open rect{stroke:var(--accent);stroke-width:2.5}
+.sm-glyph{fill:var(--accent);stroke:none}
+.sm-glyph .stroke{fill:none;stroke:var(--accent);stroke-width:2.4;stroke-linecap:round}
+.sm-glyph .hollow{fill:color-mix(in srgb,var(--accent) 22%,var(--surface))}
+.sm-glyph-inline{width:17px;height:17px;flex:none}
+
+/* Only shown when two different devices are waiting and the tap is genuinely
+   ambiguous; one device places itself. */
+.sm-pick{
+  display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:10px;
+  border:1px solid var(--line);border-radius:11px;padding:10px 12px;
+  background:var(--surface-2);
+}
+.sm-pick-h{font-size:.8rem;color:var(--muted);width:100%}
+.sm-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+  border-radius:9px;padding:8px 11px;font:inherit;font-size:.86rem;cursor:pointer;
+}
+.sm-chip:hover{border-color:var(--accent);color:var(--accent)}
+.sm-chip.ghost{border-style:dashed;color:var(--muted)}
+
+.sm-legend{list-style:none;margin:10px 0 0;padding:0;display:flex;gap:9px}
+.sm-legend li{
+  flex:1;border:1px solid var(--line);border-radius:10px;padding:7px 10px;
+  display:flex;flex-direction:column;gap:2px;min-width:0;
+}
+.sm-legend li.on{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.sm-legend-side{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
+  letter-spacing:.08em;font-size:.66rem;font-weight:600;color:var(--muted);
+}
+.sm-legend-what{font-size:.85rem;overflow-wrap:anywhere}
+.sm-legend li.on .sm-legend-what{color:var(--accent);font-weight:600}
+.sm-note{margin:10px 0 0;font-size:.81rem;color:var(--muted);line-height:1.45}
