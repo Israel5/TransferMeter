@@ -1,5 +1,6 @@
 import { fmt, dur, niceDate, countList, customerRoute, shortName, tripTotals } from "./quote";
 import { wordsFor } from "./words";
+import { cleanFlightNo } from "./links";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS, SLOT_IDS } from "./types";
 import type { AppState } from "./state";
 import type { Counts, Lang, Quote, Settings, Slots } from "./types";
@@ -40,7 +41,8 @@ export function draftMessage(st: AppState): string {
     const named = t.stops.filter((s) => !s.base && String(s.name || "").trim()).map((s) => shortName(s.name));
     parts.push((t.label === "Return" ? W.ret : W.out)
       + (t.date ? ` · ${niceDate(t.date, st.lang)}` : "")
-      + (t.time ? ` · ${W.at} ${t.time}` : ""));
+      + (t.time ? ` · ${W.at} ${t.time}` : "")
+      + (cleanFlightNo(t.flight) ? ` · ${W.flight} ${cleanFlightNo(t.flight)}` : ""));
     parts.push(`${named[0] ?? "—"} → ${named[named.length - 1] ?? "—"}`);
     parts.push(`${fmt(x.loaded, 0)} km · ${dur(x.loadedMins)} · $${fmt(x.price, 0)} CAD`);
     parts.push("");
@@ -50,7 +52,7 @@ export function draftMessage(st: AppState): string {
   const g = countList(st.gear, GEAR_KEYS, W as any);
   const b = countList(st.bags, BAG_KEYS, W as any);
   if (p) parts.push(`${W.pax}: ${p}`);
-  if (g) parts.push(`${W.gear}: ${g}`);
+  if (g) parts.push(`${W.gear}: ${g}${st.ownSeats ? ` (${W.ownSeats})` : ""}`);
   const where = seatPlaces(st.slots, st.gear, st.lang);
   if (where) parts.push(`${W.seatSide}: ${where}`);
   if (b) parts.push(`${W.bags}: ${b}`);
@@ -93,12 +95,13 @@ export function customerPayload(q: Quote, s: Settings, waDigits: (v: string) => 
         // What they are actually in the car for. Without this the sheet shows
         // the whole loop and a customer reads their own journey as two hours.
         pkm: Math.round((t.paxKm ?? 0) * 10) / 10, pmn: Math.round(t.paxMins ?? 0),
+        f: cleanFlightNo(t.flight) || undefined,
       };
     }),
     // The counts as numbers, once. The customer's page words them itself, so a
     // correction there cannot leave a stale sentence behind.
     xc: { pax: { ...(q.pax ?? {}) }, gear: { ...(q.gear ?? {}) }, bags: { ...(q.bags ?? {}) },
-          slots: { ...(q.slots ?? {}) } },
+          slots: { ...(q.slots ?? {}) }, ownSeats: !!q.ownSeats },
     seats: s.seats ?? 7,
     tot: (q.trips ?? []).reduce((n, t) => n + (t.price ?? 0), 0),
   };

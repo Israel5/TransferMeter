@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { namedAddress } from "./maps";
-import { wazeLink, customerStops, mapsLink } from "./links";
+import { wazeLink, customerStops, mapsLink, cleanFlightNo, flightRadarLink, isFlightNo } from "./links";
 
 describe("handing an address to the car", () => {
   it("uses the pin when the stop has one", () => {
@@ -76,5 +76,54 @@ describe("writing an address out in full", () => {
   it("copes with either half being missing", () => {
     expect(namedAddress("", "83 8e Rue, Laval, QC H7N 2C5, Canada")).toBe("83 8e Rue, Laval, QC H7N 2C5, Canada");
     expect(namedAddress("YUL", "")).toBe("YUL");
+  });
+});
+
+/* A flight number, and the board it opens.
+ *
+ * The number is typed by a customer on a phone, so it arrives with spaces,
+ * lower case, and sometimes a sentence around it. What is stored has to be
+ * the form a board wants, and what is linked has to be a real flight or no
+ * link at all -- a dead link on a quote is worse than a plain number. */
+describe("flight numbers", () => {
+  it("keeps the form a departure board uses, whatever was typed", () => {
+    expect(cleanFlightNo(" ac 878 ")).toBe("AC878");
+    expect(cleanFlightNo("tp-1234")).toBe("TP1234");
+    expect(cleanFlightNo("")).toBe("");
+    expect(cleanFlightNo(undefined)).toBe("");
+  });
+
+  it("links a real flight number to its board", () => {
+    expect(flightRadarLink("AC878")).toBe("https://www.flightradar24.com/data/flights/ac878");
+    expect(flightRadarLink(" ac 878 ")).toBe("https://www.flightradar24.com/data/flights/ac878");
+    // Three-character airline codes and the trailing letter some carriers use
+    expect(flightRadarLink("TAP1234")).toBe("https://www.flightradar24.com/data/flights/tap1234");
+    // Airline codes that carry a digit of their own, like easyJet's U2
+    expect(flightRadarLink("U2 1234")).toBe("https://www.flightradar24.com/data/flights/u21234");
+    expect(flightRadarLink("9W12")).toBe("https://www.flightradar24.com/data/flights/9w12");
+    expect(flightRadarLink("LH8A")).toBe("https://www.flightradar24.com/data/flights/lh8a");
+  });
+
+  // Worth storing, not worth sending anywhere.
+  it("gives no link at all to something that is not a flight number", () => {
+    expect(flightRadarLink("the 6am from Lisbon")).toBeNull();
+    expect(flightRadarLink("AC")).toBeNull();
+    // No airline code is all digits: IATA hands out two characters with a
+    // letter in them, ICAO three letters. Loosely written, this earns a link
+    // to a page that does not exist.
+    expect(flightRadarLink("12345")).toBeNull();
+    expect(flightRadarLink("")).toBeNull();
+    expect(flightRadarLink(undefined)).toBeNull();
+  });
+
+  it("agrees with itself about what is linkable", () => {
+    for (const v of ["AC878", "tp 1234", "LH8A"]) {
+      expect(isFlightNo(v)).toBe(true);
+      expect(flightRadarLink(v)).not.toBeNull();
+    }
+    for (const v of ["", "AC", "hello"]) {
+      expect(isFlightNo(v)).toBe(false);
+      expect(flightRadarLink(v)).toBeNull();
+    }
   });
 });

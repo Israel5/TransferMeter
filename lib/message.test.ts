@@ -115,3 +115,30 @@ describe("where the child seats go", () => {
       .toBe("Left: car seat");
   });
 });
+
+/* The flight and whose the seats are, on their own copy.
+ *
+ * Both used to live in the driver's private notes, which the customer link
+ * deliberately never carries -- so putting them in named fields is what makes
+ * them visible to the one person who can say they are wrong. */
+describe("the flight, on the customer's sheet", () => {
+  const flying = customerPayload(
+    { ...q, ownSeats: true,
+      trips: [{ ...q.trips[0], flight: "AC878" }, { ...q.trips[0], label: "Return", flight: "ac 879" }],
+    } as unknown as Quote,
+    S, (v: string) => v.replace(/\D/g, ""));
+
+  it("carries each leg's own flight, in the form a board uses", () => {
+    expect(flying.t[0].f).toBe("AC878");
+    expect(flying.t[1].f).toBe("AC879");
+  });
+
+  it("says nothing at all when no flight was given", () => {
+    expect(view.t[0].f).toBeUndefined();
+  });
+
+  it("carries whose child seats they are", () => {
+    expect(flying.xc.ownSeats).toBe(true);
+    expect(view.xc.ownSeats).toBe(false);
+  });
+});

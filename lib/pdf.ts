@@ -61,7 +61,7 @@ export function buildPDF(v: CustomerView): Uint8Array {
     pax: v.xc?.pax ?? {}, gear: v.xc?.gear ?? {}, bags: v.xc?.bags ?? {},
     trips: (v.t ?? []).map((leg) => ({
       label: leg.k === "ret" ? "Return" : "Outbound",
-      date: leg.d, time: leg.h,
+      date: leg.d, time: leg.h, flight: leg.f ?? "",
       stops: (leg.s ?? []).map((name) => ({ name })),
       // Which of those may be linked to a map. Taken from the payload, never
       // recomputed: by this point the driver's base is already wearing its role
@@ -201,7 +201,8 @@ export function buildPDF(v: CustomerView): Uint8Array {
 
     const head=(t.label==="Return"?W_.ret:W_.out)
       + (t.date ? "   ·   "+niceDate(t.date,q.lang) : "")
-      + (t.time ? "   ·   "+W_.at+" "+t.time : "");
+      + (t.time ? "   ·   "+W_.at+" "+t.time : "")
+      + (t.flight ? "   ·   "+W_.flight+" "+t.flight : "");
     cap(head, M+16, top-19, {color:AMBER, size:7.8});
     text("$"+fmt(t.price,0)+" CAD", W-M-16, top-21, {size:12.5,bold:true,align:"right"});
 
@@ -245,7 +246,7 @@ export function buildPDF(v: CustomerView): Uint8Array {
   const gg=countList(q.gear||{}, GEAR_KEYS, W_ as any);
   const bb=countList(q.bags||{}, BAG_KEYS, W_ as any);
   if(pp) rows.push([W_.pax, pp]);
-  if(gg) rows.push([W_.gear, gg]);
+  if(gg) rows.push([W_.gear, gg + (v.xc?.ownSeats ? "  ·  "+W_.ownSeats : "")]);
   if(bb) rows.push([W_.bags, bb]);
   if(rows.length){
     room(rows.length*17+24);

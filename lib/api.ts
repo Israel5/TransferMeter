@@ -117,7 +117,8 @@ export async function answerQuote(token: string, answer: "approved" | "declined"
 export async function updateQuoteCounts(
   token: string,
   counts: { pax?: Record<string, number>; gear?: Record<string, number>;
-            bags?: Record<string, number>; slots?: Record<string, string> },
+            bags?: Record<string, number>; slots?: Record<string, string>;
+            ownSeats?: boolean },
 ) {
   return call<{ xc?: Record<string, Record<string, number>> }>("/api/public/quote", {
     method: "PATCH", body: JSON.stringify({ token, counts }),

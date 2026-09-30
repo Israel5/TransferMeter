@@ -1366,6 +1366,11 @@ a.cq-map::after{content:"↗";font-size:.72em;opacity:.5;margin-left:.28em;verti
 .rq-check{display:flex;align-items:center;gap:9px;margin-top:14px;cursor:pointer;font-size:.9rem}
 .rq-check input{width:18px;height:18px;accent-color:var(--accent)}
 .rq-check + .rq-fields{margin-top:12px}
+/* A note under a field, for the thing the field cannot say about itself. */
+.rq-hint{margin:9px 0 0;color:var(--muted);font-size:.8rem;line-height:1.5}
+/* Whose child seats they are. It qualifies the counts above it rather than
+   asking a new question, so it sits in with them instead of below the group. */
+.own-seats{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .rq-note{
   box-sizing:border-box;width:100%;
   border:1px solid var(--line-2);border-radius:9px;padding:11px;
@@ -1511,3 +1516,28 @@ a.cq-map::after{content:"↗";font-size:.72em;opacity:.5;margin-left:.28em;verti
 .sm-legend-what{font-size:.85rem;overflow-wrap:anywhere}
 .sm-legend li.on .sm-legend-what{color:var(--accent);font-weight:600}
 .sm-note{margin:10px 0 0;font-size:.81rem;color:var(--muted);line-height:1.45}
+
+/* The flight a leg meets. A line of its own under the leg's head, because it
+   is the one fact on the sheet the customer can check better than I can. */
+.cq-flight{
+  display:flex;align-items:baseline;gap:9px;margin:0 0 11px;font-size:.86rem;
+}
+.cq-flight span{
+  font-family:"Barlow Condensed",sans-serif;text-transform:uppercase;
+  letter-spacing:.08em;font-size:.68rem;font-weight:600;color:var(--muted);
+}
+.cq-flight a,.cq-flight b{
+  font-family:"IBM Plex Mono",monospace;font-weight:600;letter-spacing:.04em;
+}
+.cq-flight a{color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+
+/* The driver's flight field, and the board it opens. Narrower than a date:
+   a flight number is six characters and a wide box invites a sentence. */
+.flight-field input{width:7.5em;text-transform:uppercase;letter-spacing:.06em}
+.fr24{white-space:nowrap}
+/* Whose child seats they are, in the driver's editor. */
+.own-seats-row{
+  display:flex;align-items:center;gap:9px;cursor:pointer;font-size:.88rem;
+  margin:12px 0 2px;padding-top:12px;border-top:1px solid var(--line);
+}
+.own-seats-row input{width:17px;height:17px;accent-color:var(--accent)}

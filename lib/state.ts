@@ -1,4 +1,5 @@
 import { DEFAULTS, emptyPax, emptyGear, emptyBags, emptySlots } from "./types";
+import { cleanFlightNo } from "./links";
 import type { Counts, Lang, Quote, QuoteContent, SavedTrip, Settings, Slots, Stop, Trip } from "./types";
 import { tripTotals, grandTotals, finishedAt } from "./quote";
 
@@ -10,6 +11,8 @@ export type AppState = {
   pax: Counts; gear: Counts; bags: Counts;
   /** Which side each child seat goes, when the customer said. */
   slots: Slots;
+  /** The seats are the customer's own; the driver brings none. */
+  ownSeats: boolean;
   customer: string; contact: string; notes: string;
   quoteNo: string;
   editingId: number | null;
@@ -46,6 +49,7 @@ export function initialState(): AppState {
     settings, learned: {},
     trips: [newTrip(settings)], active: 0,
     pax: emptyPax(), gear: emptyGear(), bags: emptyBags(), slots: emptySlots(),
+    ownSeats: false,
     customer: "", contact: "", notes: "", quoteNo: "",
     editingId: null, quotes: [], lang: "pt",
   };
@@ -70,6 +74,7 @@ export function snapshot(st: AppState): QuoteContent {
       return {
         legId: t.legId ?? newLegId(),
         label: t.label, date: t.date, time: t.time || "",
+        flight: cleanFlightNo(t.flight) || undefined,
         stops: t.stops.map((s) => ({ name: s.name, base: !!s.base, placeId: s.placeId, lat: s.lat, lng: s.lng })),
         legKm: x.legs.map((l) => l.km),
         totalKm: x.total, mins: x.mins, cost: x.cost, price: x.price,
@@ -78,7 +83,7 @@ export function snapshot(st: AppState): QuoteContent {
         actual: t.actual,
       };
     }),
-    pax: { ...st.pax }, gear: { ...st.gear }, bags: { ...st.bags }, slots: { ...st.slots },
+    pax: { ...st.pax }, gear: { ...st.gear }, bags: { ...st.bags }, slots: { ...st.slots }, ownSeats: st.ownSeats,
     totalKm: g.total, cost: g.cost, price: g.price, mins: g.mins, keep: g.price - g.cost,
   };
 }
@@ -150,6 +155,7 @@ export function loadQuote(st: AppState, id: number): AppState {
   const trips = (q.trips ?? []).map((t) => ({
     legId: t.legId,
     label: t.label, date: t.date || "", time: t.time || "",
+    flight: t.flight ?? "",
     stops: (t.stops ?? []).map((s) => ({ ...s })),
     liveLegs: t.legKm?.length ? t.legKm.map((km) => ({ km: Number(km) || 0, mins: NaN })) : null,
     priceOverride: t.price,          // pin the fare that was quoted
@@ -163,7 +169,7 @@ export function loadQuote(st: AppState, id: number): AppState {
     customer: q.customer || "", contact: q.contact || "", notes: q.notes || "",
     quoteNo: q.quoteNo || "", editingId: q.id,
     pax: { ...emptyPax(), ...q.pax }, gear: { ...emptyGear(), ...q.gear }, bags: { ...emptyBags(), ...q.bags },
-    slots: { ...(q.slots ?? {}) },
+    slots: { ...(q.slots ?? {}) }, ownSeats: !!q.ownSeats,
     lang: q.lang || st.lang,
   };
 }
@@ -174,6 +180,7 @@ export function newQuote(st: AppState): AppState {
     trips: [newTrip(st.settings)], active: 0,
     customer: "", contact: "", notes: "", quoteNo: "", editingId: null,
     pax: emptyPax(), gear: emptyGear(), bags: emptyBags(), slots: emptySlots(),
+    ownSeats: false,
   };
 }
 
@@ -183,8 +190,10 @@ export function newQuote(st: AppState): AppState {
 const shapeOf = (st: AppState) => JSON.stringify({
   customer: st.customer.trim(), contact: st.contact.trim(), notes: st.notes.trim(),
   lang: st.lang, pax: st.pax, gear: st.gear, bags: st.bags, slots: st.slots,
+  ownSeats: st.ownSeats,
   trips: st.trips.map((t) => ({
     label: t.label, date: t.date, time: t.time,
+    flight: cleanFlightNo(t.flight),
     price: t.priceOverride,
     stops: t.stops.map((x) => `${x.base ? "@base" : String(x.name ?? "").trim()}`),
   })),
@@ -193,9 +202,10 @@ const shapeOf = (st: AppState) => JSON.stringify({
 const savedShapeOf = (q: Quote) => JSON.stringify({
   customer: (q.customer ?? "").trim(), contact: (q.contact ?? "").trim(),
   notes: (q.notes ?? "").trim(), lang: q.lang, pax: q.pax, gear: q.gear, bags: q.bags,
-  slots: q.slots ?? {},
+  slots: q.slots ?? {}, ownSeats: !!q.ownSeats,
   trips: (q.trips ?? []).map((t) => ({
     label: t.label, date: t.date, time: t.time,
+    flight: cleanFlightNo(t.flight),
     price: t.price,
     stops: (t.stops ?? []).map((x) => `${x.base ? "@base" : String(x.name ?? "").trim()}`),
   })),

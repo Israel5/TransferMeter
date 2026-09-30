@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input/min";
 import { AddressField } from "./address-field";
 import { SeatMap } from "@/components/SeatMap";
+import { cleanFlightNo } from "@/lib/links";
 import { emptySlots, type Slots } from "@/lib/types";
 import "react-phone-number-input/style.css";
 
@@ -27,6 +28,8 @@ const T = {
     trip: "A viagem", from: "Onde eu te busco", to: "Pra onde você vai",
     date: "Data", time: "Horário", ret: "Também vou precisar da volta",
     retDate: "Data da volta", retTime: "Horário da volta",
+    flight: "Voo", flightPh: "AC878", flightHint: "Se souber, eu acompanho o voo.",
+    ownSeats: "Vou levar minha própria cadeirinha",
     people: "Quem vai viajar", pax: "Passageiros", gear: "Cadeirinhas", bags: "Bagagem",
     note: "Mais alguma coisa?", notePh: "Número do voo, ponto de encontro, o que for útil…",
     send: "Pedir orçamento", sending: "Enviando…",
@@ -49,6 +52,8 @@ const T = {
     trip: "The journey", from: "Where I collect you", to: "Where you're going",
     date: "Date", time: "Time", ret: "I'll need a return trip too",
     retDate: "Return date", retTime: "Return time",
+    flight: "Flight", flightPh: "AC878", flightHint: "If you know it, I'll follow the flight.",
+    ownSeats: "We'll bring our own child seat",
     people: "Who's travelling", pax: "Passengers", gear: "Child seats", bags: "Luggage",
     note: "Anything else?", notePh: "Flight number, where to meet, anything useful…",
     send: "Ask for a quote", sending: "Sending…",
@@ -71,6 +76,8 @@ const T = {
     trip: "Le trajet", from: "Où je viens vous chercher", to: "Où vous allez",
     date: "Date", time: "Heure", ret: "J'aurai aussi besoin du retour",
     retDate: "Date du retour", retTime: "Heure du retour",
+    flight: "Vol", flightPh: "AC878", flightHint: "Si vous le savez, je suivrai le vol.",
+    ownSeats: "Nous apportons notre propre siège",
     people: "Qui voyage", pax: "Passagers", gear: "Sièges enfant", bags: "Bagages",
     note: "Autre chose ?", notePh: "Numéro de vol, point de rencontre, tout ce qui aide…",
     send: "Demander un devis", sending: "Envoi…",
@@ -123,6 +130,8 @@ export default function RequestQuote() {
   const [wantReturn, setWantReturn] = useState(false);
   const [retDate, setRetDate] = useState("");
   const [retTime, setRetTime] = useState("");
+  const [flight, setFlight] = useState("");
+  const [retFlight, setRetFlight] = useState("");
   const [note, setNote] = useState("");
   const [counts, setCounts] = useState<Record<string, Counts>>({
     pax: { adults: 2, children: 0, infants: 0 }, gear: {}, bags: {},
@@ -130,6 +139,13 @@ export default function RequestQuote() {
   // Which side each child seat goes. Empty is a complete answer -- "wherever
   // you like" -- so nothing below waits on it.
   const [slots, setSlots] = useState<Slots>(emptySlots());
+  // Their own seats still take up a place and still have to be fitted, so
+  // this says who brings them rather than removing them from the car.
+  const [ownSeats, setOwnSeats] = useState(false);
+  // Asked as soon as there is a child aboard or a seat on the list, so the
+  // question reaches people who arrive at it from either direction.
+  const kidsAboard = (counts.pax?.children ?? 0) + (counts.pax?.infants ?? 0) > 0
+                  || Object.values(counts.gear ?? {}).some((n) => n > 0);
 
   // Passing the challenge is exchanged for a short-lived cookie, so the
   // address lookup below can be paid for without leaving it open to anyone.
@@ -200,9 +216,11 @@ export default function RequestQuote() {
 
     setSending(true);
     try {
-      const trips: unknown[] = [{ label: "Outbound", date, time, from: from.trim(), to: to.trim() }];
+      const trips: unknown[] = [{ label: "Outbound", date, time, flight: cleanFlightNo(flight),
+                                 from: from.trim(), to: to.trim() }];
       if (wantReturn) {
-        trips.push({ label: "Return", date: retDate, time: retTime, from: to.trim(), to: from.trim() });
+        trips.push({ label: "Return", date: retDate, time: retTime, flight: cleanFlightNo(retFlight),
+                     from: to.trim(), to: from.trim() });
       }
       const r = await fetch("/api/request", {
         method: "POST",
@@ -211,7 +229,7 @@ export default function RequestQuote() {
           payload: {
             customer: name.trim(), contact: contact.trim(), lang,
             note: note.trim(), trips,
-            pax: counts.pax, gear: counts.gear, bags: counts.bags, slots,
+            pax: counts.pax, gear: counts.gear, bags: counts.bags, slots, ownSeats,
           },
         }),
       });
@@ -353,7 +371,14 @@ export default function RequestQuote() {
               <span>{L.time}</span>
               <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </label>
+            <label className="rq-field">
+              <span>{L.flight}</span>
+              <input type="text" inputMode="text" autoCapitalize="characters" maxLength={8}
+                     placeholder={L.flightPh} value={flight}
+                     onChange={(e) => setFlight(cleanFlightNo(e.target.value))} />
+            </label>
           </div>
+          <p className="rq-hint">{L.flightHint}</p>
 
           <label className="rq-check">
             <input type="checkbox" checked={wantReturn}
@@ -370,6 +395,12 @@ export default function RequestQuote() {
               <label className="rq-field">
                 <span>{L.retTime}</span>
                 <input type="time" value={retTime} onChange={(e) => setRetTime(e.target.value)} />
+              </label>
+              <label className="rq-field">
+                <span>{L.flight}</span>
+                <input type="text" inputMode="text" autoCapitalize="characters" maxLength={8}
+                       placeholder={L.flightPh} value={retFlight}
+                       onChange={(e) => setRetFlight(cleanFlightNo(e.target.value))} />
               </label>
             </div>
           )}
@@ -394,6 +425,13 @@ export default function RequestQuote() {
                   </span>
                 </div>
               ))}
+              {key === "gear" && kidsAboard && (
+                <label className="rq-check own-seats">
+                  <input type="checkbox" checked={ownSeats}
+                         onChange={(e) => setOwnSeats(e.target.checked)} />
+                  <span>{L.ownSeats}</span>
+                </label>
+              )}
               {key === "gear" && (
                 <SeatMap gear={counts.gear ?? {}} slots={slots} lang={lang}
                          onChange={setSlots} />
