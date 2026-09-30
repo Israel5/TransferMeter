@@ -10,7 +10,7 @@ export type Words = {
   legs: [string, string]; oneway: string;
   pax: string; gear: string; bags: string;
   /** The line naming which side each child seat goes, and the two sides. */
-  seatSide: string;
+  seatSide: string; flight: string; ownSeats: string;
   out: string; ret: string; leg: string; total: string; note: string;
 };
 
@@ -20,7 +20,7 @@ export const WORDS: Record<Lang, Words> = {
       checked:["mala","malas"],carry:["bagagem de mão","bagagens de mão"],backpack:["mochila","mochilas"],
       stroller:["carrinho de bebê","carrinhos de bebê"],crib:["berço portátil","berços portáteis"],other:["item","itens"],
       pax:"Passageiros",gear:"Cadeirinhas",bags:"Bagagem",
-      seatSide:"Onde",
+      seatSide:"Onde",flight:"Voo",ownSeats:"cadeirinha do cliente",
       "2L":"Esquerda","2R":"Direita",
       startPoint:"Ponto de partida",endPoint:"Ponto de chegada",no:"Orçamento nº",noShort:"Nº",at:"às",leave:"Sair de casa",
       legs:["trecho","trechos"],oneway:"só ida",
@@ -31,7 +31,7 @@ export const WORDS: Record<Lang, Words> = {
       checked:["suitcase","suitcases"],carry:["carry-on","carry-ons"],backpack:["backpack","backpacks"],
       stroller:["stroller","strollers"],crib:["travel crib","travel cribs"],other:["item","items"],
       pax:"Passengers",gear:"Child seats",bags:"Luggage",
-      seatSide:"Where",
+      seatSide:"Where",flight:"Flight",ownSeats:"customer brings their own",
       "2L":"Left","2R":"Right",
       startPoint:"Starting point",endPoint:"End point",no:"Quote #",noShort:"No.",at:"at",leave:"Leave home",
       legs:["leg","legs"],oneway:"one way",
@@ -42,7 +42,7 @@ export const WORDS: Record<Lang, Words> = {
       checked:["valise","valises"],carry:["bagage à main","bagages à main"],backpack:["sac à dos","sacs à dos"],
       stroller:["poussette","poussettes"],crib:["lit parapluie","lits parapluie"],other:["article","articles"],
       pax:"Passagers",gear:"Sièges enfant",bags:"Bagages",
-      seatSide:"Où",
+      seatSide:"Où",flight:"Vol",ownSeats:"siège du client",
       "2L":"Gauche","2R":"Droite",
       startPoint:"Point de départ",endPoint:"Point d'arrivée",no:"Devis nº",noShort:"Nº",at:"à",leave:"Départ de la maison",
       legs:["trajet","trajets"],oneway:"aller simple",

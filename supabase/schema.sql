@@ -273,6 +273,8 @@ begin
              'label', case when t->>'label' = 'Return' then 'Return' else 'Outbound' end,
              'date',  left(coalesce(t->>'date', ''), 10),
              'time',  left(coalesce(t->>'time', ''), 5),
+             'flight', left(regexp_replace(upper(coalesce(t->>'flight', '')),
+                                           '[^A-Z0-9]', '', 'g'), 8),
              'stops', case when home = '' then '[]'::jsonb
                            else jsonb_build_array(jsonb_build_object('name', home, 'base', true)) end
                    || jsonb_build_array(
@@ -300,6 +302,7 @@ begin
     'pax',      case when jsonb_typeof(payload->'pax')  = 'object' then payload->'pax'  else '{}'::jsonb end,
     'gear',     case when jsonb_typeof(payload->'gear') = 'object' then payload->'gear' else '{}'::jsonb end,
     'bags',     case when jsonb_typeof(payload->'bags') = 'object' then payload->'bags' else '{}'::jsonb end,
+    'ownSeats', (payload->'ownSeats') = 'true'::jsonb,
     'slots',    public.clean_slots(
                   payload->'slots',
                   case when jsonb_typeof(payload->'gear') = 'object'
@@ -509,6 +512,9 @@ begin
                    'pax',  coalesce(nullif(clean -> 'pax',  '{}'::jsonb), data -> 'pax'),
                    'gear', coalesce(nullif(clean -> 'gear', '{}'::jsonb), data -> 'gear'),
                    'bags', coalesce(nullif(clean -> 'bags', '{}'::jsonb), data -> 'bags'),
+                   'ownSeats', case when counts ? 'ownSeats'
+                                    then to_jsonb((counts -> 'ownSeats') = 'true'::jsonb)
+                                    else coalesce(data -> 'ownSeats', 'false'::jsonb) end,
                    -- Re-checked whether or not this call sent any, because a
                    -- save that only lowers a gear count still has to take the
                    -- seat it paid for back out of the car.
@@ -533,7 +539,8 @@ begin
     'pax',  coalesce(q.data -> 'pax',  '{}'::jsonb),
     'gear', coalesce(q.data -> 'gear', '{}'::jsonb),
     'bags',  coalesce(q.data -> 'bags',  '{}'::jsonb),
-    'slots', coalesce(q.data -> 'slots', '{}'::jsonb)));
+    'slots',    coalesce(q.data -> 'slots',    '{}'::jsonb),
+    'ownSeats', coalesce(q.data -> 'ownSeats', 'false'::jsonb)));
 end $$;
 
 revoke all on function public.update_quote_counts(text, jsonb) from public;

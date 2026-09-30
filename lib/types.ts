@@ -26,6 +26,9 @@ export type Trip = {
   label: "Outbound" | "Return";
   date: string;            // YYYY-MM-DD
   time: string;            // HH:MM
+  /** The flight this leg meets or delivers to, e.g. "AC878". A return trip
+   *  has two, and they are rarely the same one. Absent before this existed. */
+  flight?: string;
   stops: Stop[];
   liveLegs: { km: number; mins: number }[] | null;
   priceOverride: number | null;
@@ -65,6 +68,7 @@ export type SavedTrip = {
   legId?: string;
   label: Trip["label"];
   date: string; time: string;
+  flight?: string;
   stops: Stop[];
   legKm: (number | null)[];
   totalKm: number; mins: number; cost: number; price: number;
@@ -91,6 +95,10 @@ export type QuoteContent = {
   pax: Counts; gear: Counts; bags: Counts;
   /** Absent on quotes stored before the seat map existed. */
   slots?: Slots;
+  /** The child seats are the customer's own, and the driver brings none.
+   *  The counts still say how many are in the car, because a seat occupies a
+   *  place and takes time to fit whoever owns it. */
+  ownSeats?: boolean;
   totalKm: number; cost: number; price: number; mins: number; keep: number;
 };
 
@@ -120,13 +128,15 @@ export type CustomerViewLeg = {
   r?: boolean[];
   km: number; mn: number; pr: number;
   pkm?: number; pmn?: number;
+  /** The flight number, so they can spot a wrong one on their own quote. */
+  f?: string;
 };
 
 export type CustomerView = {
   b?: string; p?: string; w?: string; n?: string; c?: string;
   l?: Lang; savedAt?: string;
   t?: CustomerViewLeg[];
-  xc?: { pax?: Counts; gear?: Counts; bags?: Counts; slots?: Slots };
+  xc?: { pax?: Counts; gear?: Counts; bags?: Counts; slots?: Slots; ownSeats?: boolean };
   seats?: number;
   tot?: number;
 };

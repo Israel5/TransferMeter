@@ -1,6 +1,6 @@
 "use client";
 
-import { mapsLink } from "@/lib/links";
+import { flightRadarLink, mapsLink } from "@/lib/links";
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchQuoteByToken, answerQuote, updateQuoteCounts } from "@/lib/api";
@@ -24,13 +24,16 @@ type Leg = {
   km: number; mn: number; pr: number;
   /** The part with the passenger aboard. Absent on links sent before this. */
   pkm?: number; pmn?: number;
+  /** The flight this leg meets. Shown so a wrong one is spotted by the only
+   *  person who knows it is wrong. */
+  f?: string;
 };
 type Counts = Record<string, number>;
 type Payload = {
   b?: string; p?: string; w?: string; n?: string; c?: string;
   l?: "pt" | "en" | "fr";
   t?: Leg[];
-  xc?: { pax?: Counts; gear?: Counts; bags?: Counts; slots?: Slots };
+  xc?: { pax?: Counts; gear?: Counts; bags?: Counts; slots?: Slots; ownSeats?: boolean };
   seats?: number;
   tot?: number;
 };
@@ -68,6 +71,7 @@ const T = {
     title: "Orçamento de transfer", forWhom: "Transfer de", quote: "Orçamento nº",
     out: "Ida", ret: "Volta", at: "às", total: "Total",
     pax: "Passageiros", gear: "Cadeirinhas", bags: "Bagagem",
+    flight: "Voo", ownSeats: "Cadeirinha do cliente",
     ask: "Tudo certo com o orçamento?", yes: "Aprovar", no: "Recusar",
     review: "Confira seus dados", edit: "Corrigir", done: "Salvar", cancel: "Cancelar",
     editHint: "Mudou alguma coisa? É só ajustar aqui que eu fico sabendo. O preço não muda.",
@@ -89,6 +93,7 @@ const T = {
     title: "Transfer quote", forWhom: "Transfer for", quote: "Quote no.",
     out: "Outbound", ret: "Return", at: "at", total: "Total",
     pax: "Passengers", gear: "Child seats", bags: "Luggage",
+    flight: "Flight", ownSeats: "You bring your own child seat",
     ask: "Does this all look right?", yes: "Approve", no: "Decline",
     review: "Check your details", edit: "Correct", done: "Save", cancel: "Cancel",
     editHint: "Something changed? Adjust it here and I'll know. The price stays the same.",
@@ -110,6 +115,7 @@ const T = {
     title: "Devis de transfert", forWhom: "Transfert pour", quote: "Devis nº",
     out: "Aller", ret: "Retour", at: "à", total: "Total",
     pax: "Passagers", gear: "Sièges enfant", bags: "Bagages",
+    flight: "Vol", ownSeats: "Siège du client",
     ask: "Est-ce que tout est correct ?", yes: "Approuver", no: "Refuser",
     review: "Vérifiez vos informations", edit: "Corriger", done: "Enregistrer", cancel: "Annuler",
     editHint: "Un changement ? Ajustez ici et je serai au courant. Le prix ne change pas.",
@@ -161,6 +167,7 @@ export function CustomerQuote({ token }: { token: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Record<string, Counts>>({});
   const [draftSlots, setDraftSlots] = useState<Slots>(emptySlots());
+  const [draftOwn, setDraftOwn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedNote, setSavedNote] = useState(false);
   const [saveFail, setSaveFail] = useState(false);
@@ -197,6 +204,8 @@ export function CustomerQuote({ token }: { token: string }) {
   const heads = (draft.pax?.adults ?? 0) + (draft.pax?.children ?? 0)
               + (draft.pax?.infants ?? 0);
   const overSeats = editing && heads > seats;
+  const kidsAboard = (draft.pax?.children ?? 0) + (draft.pax?.infants ?? 0) > 0
+                  || Object.values(draft.gear ?? {}).some((n) => n > 0);
 
   const answer = async (choice: "approved" | "declined") => {
     if (!token || busy) return;
@@ -225,6 +234,7 @@ export function CustomerQuote({ token }: { token: string }) {
   const startEdit = () => {
     setDraft(JSON.parse(JSON.stringify(counts)));
     setDraftSlots({ ...(q?.xc?.slots ?? {}) });
+    setDraftOwn(!!q?.xc?.ownSeats);
     setSavedNote(false); setSaveFail(false);
     setEditing(true);
   };
@@ -241,8 +251,8 @@ export function CustomerQuote({ token }: { token: string }) {
     if (!token || saving) return;
     setSaving(true); setSaveFail(false);
     try {
-      await updateQuoteCounts(token, { ...draft, slots: draftSlots });
-      setQ((prev) => (prev ? { ...prev, xc: { ...prev.xc, ...draft, slots: draftSlots } } : prev));
+      await updateQuoteCounts(token, { ...draft, slots: draftSlots, ownSeats: draftOwn });
+      setQ((prev) => (prev ? { ...prev, xc: { ...prev.xc, ...draft, slots: draftSlots, ownSeats: draftOwn } } : prev));
       setEditing(false); setSavedNote(true);
     } catch { setSaveFail(true); }
     finally { setSaving(false); }
@@ -303,6 +313,18 @@ export function CustomerQuote({ token }: { token: string }) {
                 <span className="cq-fare">{money(leg.pr)}</span>
               </div>
 
+              {/* Their flight, back on their own sheet. The link is mostly
+                  mine, but they are the only one who knows the number is
+                  wrong, and a wrong one is easiest to spot written out. */}
+              {leg.f && (
+                <p className="cq-flight">
+                  <span>{L.flight}</span>
+                  {flightRadarLink(leg.f)
+                    ? <a href={flightRadarLink(leg.f)!} target="_blank" rel="noreferrer noopener">{leg.f}</a>
+                    : <b>{leg.f}</b>}
+                </p>
+              )}
+
               <ol className="cq-route">
                 {(leg.s ?? []).map((name, n) => (
                   <li key={n} className={n === 0 || n === leg.s.length - 1 ? "end" : ""}>
@@ -356,7 +378,10 @@ export function CustomerQuote({ token }: { token: string }) {
             <>
               <dl className="cq-details">
                 {GROUPS.map(({ key, items }) => {
-                  const text = phrase(counts[key] ?? {}, items, dict);
+                  const said = phrase(counts[key] ?? {}, items, dict);
+                  const text = key === "gear" && q?.xc?.ownSeats
+                    ? [said, L.ownSeats].filter(Boolean).join("  ·  ")
+                    : said;
                   return (
                     <div key={key} className={"cq-detail" + (text ? "" : " empty")}>
                       <dt>{L[key]}</dt>
@@ -391,6 +416,13 @@ export function CustomerQuote({ token }: { token: string }) {
                       </span>
                     </div>
                   ))}
+                  {key === "gear" && kidsAboard && (
+                    <label className="rq-check own-seats">
+                      <input type="checkbox" checked={draftOwn}
+                             onChange={(e) => setDraftOwn(e.target.checked)} />
+                      <span>{L.ownSeats}</span>
+                    </label>
+                  )}
                   {key === "gear" && (
                     <SeatMap gear={draft.gear ?? {}} slots={draftSlots}
                              lang={q?.l ?? "pt"} onChange={setDraftSlots} />

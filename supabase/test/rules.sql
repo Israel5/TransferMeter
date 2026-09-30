@@ -180,6 +180,38 @@ begin
     raise warning 'lowering the count left a seat strapped in: %', got->'slots';
   end if;
 
+  -- ----------------------------------------- the flight, and whose seats -----
+  ran := ran + 1;
+  tok := public.request_quote('{"customer":"Flight Deck","contact":"+15140000002",
+    "trips":[{"label":"Outbound","from":"YUL","to":"Home","flight":" ac 878 "},
+             {"label":"Return","from":"Home","to":"YUL","flight":"ac879"}],
+    "ownSeats":true}'::jsonb, 'test-secret');
+  select data into got from public.quotes where share_token = tok;
+  -- Stored the way a board wants it, whatever the customer typed.
+  if got->'trips'->0->>'flight' <> 'AC878' or got->'trips'->1->>'flight' <> 'AC879' then
+    failed := failed + 1;
+    raise warning 'the flight numbers did not survive: % %',
+      got->'trips'->0->>'flight', got->'trips'->1->>'flight';
+  end if;
+  -- Each leg keeps its own: a return is rarely the same flight back.
+  if (got->'ownSeats')::boolean is not true then
+    failed := failed + 1; raise warning 'whose seats they are did not survive: %', got->'ownSeats';
+  end if;
+
+  -- Anything but a real yes is a no. A stranger's "maybe" is not a promise
+  -- the driver can leave a child seat at home on.
+  ran := ran + 1;
+  tok := public.request_quote('{"customer":"Maybe","contact":"+15140000003",
+    "trips":[{"from":"A","to":"B","flight":"<script>"}],"ownSeats":"yes"}'::jsonb, 'test-secret');
+  select data into got from public.quotes where share_token = tok;
+  if (got->'ownSeats')::boolean is not false then
+    failed := failed + 1; raise warning 'a non-answer was read as yes: %', got->'ownSeats';
+  end if;
+  if got->'trips'->0->>'flight' <> 'SCRIPT' then
+    failed := failed + 1;
+    raise warning 'a flight number was stored unscrubbed: %', got->'trips'->0->>'flight';
+  end if;
+
   -- ------------------------------------------- the table refuses it too -----
   -- Belt and braces: whatever writes, a quote without a leg cannot be stored.
   ran := ran + 1;

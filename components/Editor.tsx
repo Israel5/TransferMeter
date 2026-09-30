@@ -9,6 +9,7 @@ import { NumberField } from "./NumberField";
 import { fmt, dur, niceDate, legInfo, scheduleFor, tripTotals, shortName } from "@/lib/quote";
 import { PLACE_BY_NAME } from "@/lib/places";
 import { cleanContact } from "@/lib/whatsapp";
+import { cleanFlightNo, flightRadarLink } from "@/lib/links";
 import { parseCoords } from "@/lib/quote";
 import { PAX_KEYS, GEAR_KEYS, BAG_KEYS } from "@/lib/types";
 import { hasUnsavedChanges, affectsCustomer } from "@/lib/state";
@@ -42,6 +43,7 @@ export function Editor({
   const people = (st.pax.adults ?? 0) + (st.pax.children ?? 0) + (st.pax.infants ?? 0);
   const seats = (st.gear.infantSeat ?? 0) + (st.gear.carSeat ?? 0) + (st.gear.booster ?? 0);
   const bagCount = BAG_KEYS.reduce((n, [k]) => n + (st.bags[k] ?? 0), 0);
+  const kidsAboard = (st.pax.children ?? 0) + (st.pax.infants ?? 0) > 0 || seats > 0;
   const summary = [people && `${people} pax`, seats && `${seats} seat${seats > 1 ? "s" : ""}`,
                    bagCount && `${bagCount} bag${bagCount > 1 ? "s" : ""}`].filter(Boolean).join(" · ");
   const warn = people > st.settings.seats
@@ -155,6 +157,21 @@ export function Editor({
                   <input id="trip-time" type="time" value={trip.time}
                          onChange={(e) => setTrip(st.active, { time: e.target.value })} />
                 </span>
+                {/* Per leg, because a return is rarely the same flight back.
+                    The link goes to the flight-number page rather than to one
+                    day's flight id: a quote is written weeks before it flies. */}
+                <span className="date-field flight-field">
+                  <label className="label" htmlFor="trip-flight">Flight</label>
+                  <input id="trip-flight" type="text" placeholder="AC878" maxLength={8}
+                         autoCapitalize="characters" spellCheck={false}
+                         value={trip.flight ?? ""}
+                         onChange={(e) => setTrip(st.active, { flight: cleanFlightNo(e.target.value) })} />
+                </span>
+                {flightRadarLink(trip.flight) && (
+                  <a className="link fr24" href={flightRadarLink(trip.flight)!}
+                     target="_blank" rel="noreferrer noopener"
+                     title={`Track ${cleanFlightNo(trip.flight)} on Flightradar24`}>Track ↗</a>
+                )}
                 <span className="top-spacer" />
                 <button className="icon" type="button" title="Reverse this route" aria-label="Reverse this route"
                         onClick={() => patchStops(stops.slice().reverse())}>⇅</button>
@@ -254,6 +271,13 @@ export function Editor({
                   is a phone call -- "can you put it behind me instead" -- and
                   because a map that only watches would let a lowered count
                   leave a seat strapped in with nothing to explain it. */}
+              {kidsAboard && (
+                <label className="own-seats-row">
+                  <input type="checkbox" checked={st.ownSeats}
+                         onChange={(e) => set({ ownSeats: e.target.checked })} />
+                  <span>Customer brings their own child seat</span>
+                </label>
+              )}
               <SeatMap gear={st.gear} slots={st.slots ?? {}} lang={st.lang}
                        onChange={(slots) => set({ slots })} />
               <CounterGroup title="Luggage" keys={BAG_KEYS} store={st.bags}
