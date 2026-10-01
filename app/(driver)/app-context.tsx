@@ -8,7 +8,7 @@ import { Calendar } from "@/components/Calendar";
 
 import { SettingsPanel } from "@/components/SettingsPanel";
 import {
-  initialState, loadQuote, newQuote, saveQuote, withQuote,
+  initialState, loadQuote, newQuote, saveQuote, withQuote, hasUnsavedChanges,
   type AppState,
 } from "@/lib/state";
 import { draftMessage, customerPayload } from "@/lib/message";
@@ -57,6 +57,11 @@ function useAppState() {
   const [password, setPassword] = useState("");
   const [signInMsg, setSignInMsg] = useState<{ text: string; good?: boolean }>({ text: "" });
 
+  // What the listeners below read: a closure would hold the state as it was
+  // when it was attached, which is the state they most need not to trust.
+  const stRef = useRef(st);
+  stRef.current = st;
+
   const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const routeSeq = useRef(0);
@@ -77,6 +82,44 @@ function useAppState() {
       setBooted(true);
     })();
   }, []);
+
+  /* ---------- coming back to a tab that was left open ---------- */
+  /* The boot above runs once, so a phone left in a pocket keeps showing
+   * whatever was true when it was last opened -- and a quote corrected on the
+   * laptop never arrives. Reloading does not always help either: a browser
+   * restoring a page from its back/forward cache puts the old React state back
+   * without re-running a single effect, which looks exactly like a refresh
+   * that did nothing.
+   *
+   * So the tab becoming visible again is treated as a reason to ask. Never
+   * while there is unsaved work in hand, though: the answer would overwrite
+   * what the driver is in the middle of typing, and a stale screen is a far
+   * smaller problem than a lost edit. */
+  useEffect(() => {
+    if (!signedIn) return;
+
+    let busy = false;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible" || busy) return;
+      if (hasUnsavedChanges(stRef.current)) return;
+      busy = true;
+      try {
+        const remote = await pull();
+        // Checked again on the way in: the await above is long enough for the
+        // driver to have started typing.
+        if (remote) setSt((prev) => (hasUnsavedChanges(prev) ? prev : { ...prev, ...remote } as AppState));
+      } catch { /* offline, or signed out elsewhere; the next return tries again */ }
+      finally { busy = false; }
+    };
+
+    document.addEventListener("visibilitychange", refresh);
+    // Fired on a back/forward-cache restore, where visibilitychange is not.
+    window.addEventListener("pageshow", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("pageshow", refresh);
+    };
+  }, [signedIn]);
 
   /* ---------- persist ---------- */
   /** Save now and wait for it, for the actions that cannot proceed until the

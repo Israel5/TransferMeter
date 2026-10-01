@@ -15,6 +15,10 @@ import type { Quote } from "./types";
 
 async function call<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, {
+    // Never a stored copy. The routes say so themselves, but a browser that
+    // already holds one answers from it without asking, and the stale copy a
+    // driver sees is the one on the phone they are not sitting in front of.
+    cache: "no-store",
     ...init,
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
