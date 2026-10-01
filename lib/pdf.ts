@@ -246,7 +246,11 @@ export function buildPDF(v: CustomerView): Uint8Array {
   const gg=countList(q.gear||{}, GEAR_KEYS, W_ as any);
   const bb=countList(q.bags||{}, BAG_KEYS, W_ as any);
   if(pp) rows.push([W_.pax, pp]);
-  if(gg) rows.push([W_.gear, gg + (v.xc?.ownSeats ? "  ·  "+W_.ownSeats : "")]);
+  // Whose the seats are is worth a line even with no counts beside it: a
+  // customer bringing their own often leaves the counts alone, because from
+  // where they sit they are not asking for anything.
+  const own = v.xc?.ownSeats ? W_.ownSeats : "";
+  if(gg||own) rows.push([W_.gear, [gg, own].filter(Boolean).join("  ·  ")]);
   if(bb) rows.push([W_.bags, bb]);
   if(rows.length){
     room(rows.length*17+24);

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { customerPayload, seatPlaces } from "./message";
+import { customerPayload, draftMessage, seatPlaces } from "./message";
+import { initialState } from "./state";
 import { buildPDF } from "./pdf";
 import type { Quote, Settings } from "./types";
 
@@ -140,5 +141,49 @@ describe("the flight, on the customer's sheet", () => {
   it("carries whose child seats they are", () => {
     expect(flying.xc.ownSeats).toBe(true);
     expect(view.xc.ownSeats).toBe(false);
+  });
+});
+
+/* The child-seat line, when the only thing to say is whose they are.
+ *
+ * Both of these print a line per group and both used to gate that line on a
+ * count being non-zero -- so a customer who ticked "my own seat" and left the
+ * counts alone said nothing at all, on the message and on the sheet. Leaving
+ * the counts alone is the likely thing to do: from where they sit they are
+ * not asking for anything. */
+describe("child seats the customer brings", () => {
+  const base = {
+    ...initialState(),
+    customer: "Nara", lang: "pt" as const,
+    trips: [{
+      label: "Outbound" as const, date: "2026-09-08", time: "17:00",
+      stops: [{ name: HOME, base: true, lat: 45.4962, lng: -73.6515 },
+              { name: "83 8e Rue, Laval" }, { name: "YUL" }],
+      liveLegs: [{ km: 14.7, mins: 20 }, { km: 22.1, mins: 27 }],
+      priceOverride: 60,
+    }],
+    settings: S,
+  };
+
+  it("says so with no counts beside it", () => {
+    const said = draftMessage({ ...base, gear: {}, ownSeats: true });
+    expect(said).toContain("Cadeirinhas: cadeirinha própria");
+  });
+
+  it("says both when there are counts as well", () => {
+    const said = draftMessage({ ...base, gear: { booster: 1 }, ownSeats: true });
+    expect(said).toContain("Cadeirinhas: 1 booster · cadeirinha própria");
+  });
+
+  it("keeps quiet when there is nothing to say", () => {
+    expect(draftMessage({ ...base, gear: {}, ownSeats: false })).not.toContain("Cadeirinhas");
+  });
+
+  // The sheet the customer keeps, built from the view rather than the state.
+  it("reaches the PDF too, with no counts beside it", () => {
+    const sheet = Buffer.from(buildPDF({
+      ...view, l: "pt", xc: { pax: { adults: 2 }, gear: {}, bags: {}, ownSeats: true },
+    })).toString("latin1");
+    expect(sheet).toContain("cadeirinha própria");
   });
 });
