@@ -8,6 +8,26 @@ const config: NextConfig = {
 
   async headers() {
     return [{
+      /* Nothing a signed-in driver is shown may be stored by anything.
+       *
+       * Left to itself Next labels these "public, max-age=0, must-revalidate",
+       * which invites every shared cache between here and the phone to keep a
+       * copy of one driver's quotes -- and, with no Vary on the cookie, to
+       * hand that copy to the next request that asks for the same address.
+       * The page itself is already no-store; this is the data inside it,
+       * which is the part that was going stale on a second device.
+       *
+       * Set here rather than route by route so a route added later cannot
+       * forget it. Every route under /api is a reply to the person asking,
+       * computed when they ask: there is nothing here worth a cache. */
+      source: "/api/:path*",
+      headers: [
+        { key: "Cache-Control", value: "no-store, private" },
+        // Belt and braces: says out loud what the reply depends on, so a
+        // cache that stores it anyway cannot serve it to somebody else.
+        { key: "Vary", value: "Cookie" },
+      ],
+    }, {
       // A customer's link carries their token in the path, so it is now
       // something a browser could pass on. Nothing leaves this page with it.
       source: "/quote/:token*",
