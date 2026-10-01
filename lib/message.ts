@@ -52,7 +52,10 @@ export function draftMessage(st: AppState): string {
   const g = countList(st.gear, GEAR_KEYS, W as any);
   const b = countList(st.bags, BAG_KEYS, W as any);
   if (p) parts.push(`${W.pax}: ${p}`);
-  if (g) parts.push(`${W.gear}: ${g}${st.ownSeats ? ` (${W.ownSeats})` : ""}`);
+  // Same as the sheet: the line is worth printing for the flag alone, or the
+  // driver loads a seat the customer is already bringing.
+  const own = st.ownSeats ? W.ownSeats : "";
+  if (g || own) parts.push(`${W.gear}: ${[g, own].filter(Boolean).join(" · ")}`);
   const where = seatPlaces(st.slots, st.gear, st.lang);
   if (where) parts.push(`${W.seatSide}: ${where}`);
   if (b) parts.push(`${W.bags}: ${b}`);
